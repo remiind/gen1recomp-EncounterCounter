@@ -1,0 +1,48 @@
+name: Android APK (EncounterCounter fork)
+
+# Debug-signed APK of this fork (German Emerald support), installed under its
+# own application id so it sits next to the official app instead of
+# replacing it. Uploaded as a workflow artifact only.
+
+on:
+  push:
+    branches: [dev]
+    paths-ignore:
+      - '**.md'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  android:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "17"
+
+      - name: Install Android SDK platform + NDK
+        run: |
+          set -euo pipefail
+          SDK="${ANDROID_SDK_ROOT:-$ANDROID_HOME}"
+          echo "ANDROID_SDK_ROOT=$SDK" >> "$GITHUB_ENV"
+          echo "ANDROID_HOME=$SDK" >> "$GITHUB_ENV"
+          yes | "$SDK/cmdline-tools/latest/bin/sdkmanager" --licenses > /dev/null || true
+          "$SDK/cmdline-tools/latest/bin/sdkmanager" "platforms;android-36" "build-tools;36.0.0" "ndk;25.2.9519653" > /dev/null
+
+      - name: Build APK
+        env:
+          GEN1RECOMP_APP_NAME: "gen1recomp DE"
+        run: |
+          set -euo pipefail
+          scripts/build_android.sh --test-application-id com.remiind.gen1recomp.de
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: gen1recomp-DE-android
+          path: dist/android/**/*.apk
+          if-no-files-found: error

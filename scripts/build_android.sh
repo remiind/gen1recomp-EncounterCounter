@@ -112,7 +112,7 @@ if [ -n "$TEST_APPLICATION_ID" ]; then
     fail "invalid --test-application-id '$TEST_APPLICATION_ID' (expected a dotted package id, e.g. com.theboisclub.pokemonred.shaderfxtest)"
   fi
   APPLICATION_ID="$TEST_APPLICATION_ID"
-  APP_NAME="gen1recomp (test)"
+  APP_NAME="${GEN1RECOMP_APP_NAME:-gen1recomp (test)}"
 fi
 # Optional overrides for side-by-side test APKs (never used by CI shipping builds).
 if [ -n "${GEN1RECOMP_ANDROID_APPLICATION_ID:-}" ]; then
