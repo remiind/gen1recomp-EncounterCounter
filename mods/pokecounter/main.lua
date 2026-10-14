@@ -22,6 +22,7 @@ return function(mod)
   mod.options:define({
     { key = "autopause", label = "SHINY AUTO-PAUSE", type = "toggle", default = true },
     { key = "host", label = "DISPLAY IP (EMPTY = AUTO)", type = "text", default = "", maxLen = 15 },
+    { key = "status", label = "STATUS MESSAGES", type = "toggle", default = true },
   })
 
   local function now()
@@ -97,11 +98,26 @@ return function(mod)
     return tonumber(item) or 0
   end
 
+  -- ---------------------------------------------------------- status line
+  -- Short messages at the bottom of the game picture, so the player can see
+  -- whether the display is reachable without a log.
+  local toasts = {}
+  local function toast(text)
+    log("%s", text)
+    if mod.options:get("status") == false then return end
+    toasts[#toasts + 1] = { text = text, untilT = now() + 4 }
+    while #toasts > 3 do table.remove(toasts, 1) end
+  end
+
   -- ---------------------------------------------------------------- network
   local socket = engine("socket")
   local udp
   local netTried = false
   local learnedIp, mdnsIp, mdnsAt = nil, nil, -1e9
+  local subnetBroadcast = nil -- a.b.c.255 of the local address (some Wi-Fi stacks drop 255.255.255.255)
+  local pingAt = -1e9
+  local startedAt = now()
+  local warnedMissing = false
   local queue = {}
 
   local MDNS_QUERY = string.char(
@@ -112,7 +128,7 @@ return function(mod)
     if netTried then return udp ~= nil end
     netTried = true
     if not socket or not socket.udp then
-      log("LuaSocket not available, encounters are not reported")
+      toast("PokeCounter: kein Netzwerk (LuaSocket fehlt)")
       return false
     end
     local u = socket.udp()
@@ -121,11 +137,24 @@ return function(mod)
     -- bind first: SO_BROADCAST on a socket without a descriptor fails
     local ok = u:setsockname("*", 0)
     if not ok then
-      log("could not open a UDP socket")
+      toast("PokeCounter: UDP-Socket nicht moeglich")
       pcall(function() u:close() end)
       return false
     end
     if not u:setoption("broadcast", true) then log("broadcast not allowed, using mDNS only") end
+    -- local address without sending anything: a connected UDP socket knows
+    -- which interface it would use
+    pcall(function()
+      local probe = socket.udp()
+      probe:setpeername("192.0.2.1", 9)
+      local ip = probe:getsockname()
+      probe:close()
+      local a, b, c = tostring(ip or ""):match("^(%d+)%.(%d+)%.(%d+)%.%d+$")
+      if a and ip ~= "0.0.0.0" and a ~= "127" then
+        subnetBroadcast = a .. "." .. b .. "." .. c .. ".255"
+        log("local address %s, subnet broadcast %s", ip, subnetBroadcast)
+      end
+    end)
     udp = u
     return true
   end
@@ -145,8 +174,13 @@ return function(mod)
   end
 
   local function sendDatagram(json)
-    local to = configuredHost() or learnedIp or mdnsIp or "255.255.255.255"
-    udp:sendto(json, to, PORT)
+    local to = configuredHost() or learnedIp or mdnsIp
+    if to then
+      udp:sendto(json, to, PORT)
+      return
+    end
+    udp:sendto(json, "255.255.255.255", PORT)
+    if subnetBroadcast then udp:sendto(json, subnetBroadcast, PORT) end
   end
 
   local function pump()
@@ -165,10 +199,15 @@ return function(mod)
           end
         end
       elseif port == PORT then
-        if not learnedIp then log("display found at %s", ip) end
+        if not learnedIp then toast("PokeCounter verbunden (" .. tostring(ip) .. ")") end
         learnedIp = ip
-        if #queue > 0 and data:find('"ok"', 1, true) then
-          table.remove(queue, 1)
+        local head = queue[1]
+        -- a reply right after a startup ping may be the ping's answer: keep
+        -- the report then (the display drops repeats by eid)
+        local pingReply = head and head.firstSent and head.firstSent - pingAt < 0.5 and now() - pingAt < 0.5
+        if head and not pingReply and data:find('"ok"', 1, true) then
+          local done = table.remove(queue, 1)
+          if done.label then toast("PokeCounter: " .. done.label .. " gemeldet") end
         end
       end
     end
@@ -176,23 +215,35 @@ return function(mod)
     if not learnedIp and not mdnsIp and not configuredHost() and t - mdnsAt > 5 then
       sendMdns()
     end
+    -- find the display before the first encounter: a ping answers like a
+    -- report but counts nothing
+    if not learnedIp and #queue == 0 and t - pingAt > 4 then
+      pingAt = t
+      sendDatagram('{"t":"ping"}')
+    end
+    if not learnedIp and not warnedMissing and t - startedAt > 20 then
+      warnedMissing = true
+      toast("PokeCounter: Display nicht gefunden (gleiches WLAN? sonst IP in den Mod-Optionen)")
+    end
     local p = queue[1]
     if not p or t < p.nextAt then return end
     if p.tries >= MAX_TRIES then
       log("no reply from display, dropping: %s", p.json)
+      toast("PokeCounter: keine Antwort vom Display")
       learnedIp = nil -- fall back to mDNS / broadcast
       table.remove(queue, 1)
       return
     end
     sendDatagram(p.json)
+    p.firstSent = p.firstSent or t
     p.tries = p.tries + 1
     p.nextAt = t + RETRY_S
   end
 
-  local function enqueue(json)
+  local function enqueue(json, label)
     if not netInit() then return end
     if #queue >= QUEUE_MAX then table.remove(queue, 1) end
-    queue[#queue + 1] = { json = json, tries = 0, nextAt = 0 }
+    queue[#queue + 1] = { json = json, tries = 0, nextAt = 0, label = label }
     pump() -- first try right away
   end
 
@@ -278,7 +329,7 @@ return function(mod)
       shinyAt = now()
       shinyName = mon.name or mon.nickname
     end
-    enqueue(json)
+    enqueue(json, (shiny and "SHINY " or "") .. "#" .. sp)
   end
 
   mod.events:on("battle.started", function(ev)
@@ -333,10 +384,27 @@ return function(mod)
 
   mod.hooks:wrap("render.hud", function(next, game, vp)
     next(game, vp)
-    if not (held or shinyAt) or type(vp) ~= "table" then return end
+    if type(vp) ~= "table" then return end
     local g = love.graphics
     local gx, gy = vp.gameX or 0, vp.gameY or 0
     local gw, gh = vp.gameWidth or vp.width or g.getWidth(), vp.gameHeight or vp.height or g.getHeight()
+    local t = now()
+    for i = #toasts, 1, -1 do if toasts[i].untilT < t then table.remove(toasts, i) end end
+    if #toasts > 0 then
+      local f = font(gh * 0.035)
+      local lh = f:getHeight() + 6
+      g.push("all")
+      g.setFont(f)
+      for i, m in ipairs(toasts) do
+        local y = gy + gh - (#toasts - i + 1) * lh - 4
+        g.setColor(0, 0, 0, 0.65)
+        g.rectangle("fill", gx, y, gw, lh)
+        g.setColor(1, 1, 1, 1)
+        g.printf(m.text, gx + 6, y + 3, gw - 12, "left")
+      end
+      g.pop()
+    end
+    if not (held or shinyAt) then return end
     local bh = math.floor(gh * 0.22)
     local by = gy + math.floor(gh * 0.06)
     g.push("all")
@@ -361,4 +429,5 @@ return function(mod)
 
   if netInit() then sendMdns() end
   log("PokeCounter active (%s)", gameCode())
+  toast("PokeCounter aktiv, suche Display ...")
 end
