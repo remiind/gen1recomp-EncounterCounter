@@ -41743,7 +41743,7 @@ sKarateChopDescription 6296c3 32 253
 sKecleonLevelUpLearnset 33939a 1c 247
 sKeenEyeDescription 32fdf8 1b 66
 sKelpsyBerryDesc 592288 31 178
-sKeyboardChars 59cb48 60 231
+sKeyboardChars 59cb48 6c 231
 sKeyboardCursorTiles 308bf0 284 322
 sKeyboardKeyHandlers 59cc30 10 231
 sKeyboardPageMaxRow 308884 4 322
@@ -42905,7 +42905,7 @@ sPCNameStrings 59c878 10 291
 sPPMaxDesc 591747 2f 178
 sPPUpDesc 5916f1 2a 178
 sPageColumnCounts 59cbb4 3 231
-sPageColumnXPos 59cbb7 18 231
+sPageColumnXPos 59cbb7 1b 231
 sPageDescriptions 631828 38 264
 sPageInfoTemplate 62e220 20 253
 sPageMovesTemplate 62e268 18 253

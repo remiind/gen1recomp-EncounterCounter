@@ -1643,7 +1643,7 @@ local function build(L)
     if sid == nil then sid = otId == tid and num(ctx.secretId, 0) or 0 end
     local isEgg = mon.isEgg == true
     -- src/daycare.c:1098
-    local language = num(mon.language, isEgg and L.LANGUAGE_JAPANESE or L.LANGUAGE_ENGLISH)
+    local language = num(mon.language, isEgg and L.LANGUAGE_JAPANESE or require("src.core.game3.lang").game())
     local nickname = mon.nickname
     if type(nickname) ~= "string" or nickname == "" then
       nickname = mon.name or (ctx.speciesName and ctx.speciesName(species)) or ""

@@ -581,7 +581,7 @@ function Breeding.hatchMon(session, mon)
   mon.nickname = ""
   mon.name = (Pokemon.name and Pokemon.name(species)) or mon.name
   -- pokefirered/src/daycare.c:1626
-  mon.language = 2
+  mon.language = require("src.core.game3.lang").game()
   -- pokefirered/src/pokemon.c:1796
   local trainerId = session and tonumber(session.trainerId or session.id or session.playerId)
   if trainerId then

@@ -64,6 +64,24 @@
    "obj": "credits.o",
    "de": "0x5f7b00",
    "size": "0x44c"
+  },
+  {
+   "name": "sKeyboardChars",
+   "obj": "naming_screen.o",
+   "de": "0x59cb48",
+   "size": "0x6c"
+  },
+  {
+   "name": "sPageColumnCounts",
+   "obj": "naming_screen.o",
+   "de": "0x59cbb4",
+   "size": "0x3"
+  },
+  {
+   "name": "sPageColumnXPos",
+   "obj": "naming_screen.o",
+   "de": "0x59cbb7",
+   "size": "0x1b"
   }
  ],
  "drop": [

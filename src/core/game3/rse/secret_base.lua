@@ -10,7 +10,10 @@ SB.COUNT = 20
 SB.PLAYER_NAME_LENGTH = 7
 SB.TRAINER_ID_LENGTH = 4
 -- pokeemerald/include/constants/global.h:30
-SB.GAME_LANGUAGE = 2
+-- EncounterCounter fork: GAME_LANGUAGE follows the dump (German Smaragd -> 5)
+setmetatable(SB, { __index = function(_, k)
+  if k == "GAME_LANGUAGE" then return require("src.core.game3.lang").game() end
+end })
 -- pokeemerald/include/constants/secret_bases.h:4
 SB.TYPE = { RED_CAVE = 1, BROWN_CAVE = 2, BLUE_CAVE = 3, YELLOW_CAVE = 4, TREE = 5, SHRUB = 6 }
 -- pokeemerald/include/constants/secret_bases.h:26

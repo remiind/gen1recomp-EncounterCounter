@@ -31,6 +31,9 @@ local CHARMAP = {
   [0xEE] = "z",
   [0xEF] = "▶",
   [0xF0] = ":", -- FRLG colon (NOT Gen2 yen)
+  -- EncounterCounter fork: German dump text (charmap.txt:148, charmap.txt:23)
+  [0xF1] = "Ä", [0xF2] = "Ö", [0xF3] = "Ü", [0xF4] = "ä", [0xF5] = "ö", [0xF6] = "ü",
+  [0x15] = "ß",
 }
 
 TextIR.CHARMAP = CHARMAP

@@ -14,7 +14,10 @@ Town.EC_NUM_GROUPS = 22
 -- pokeemerald/include/constants/easy_chat.h:1129
 Town.EC_EMPTY_WORD = 0xFFFF
 -- pokeemerald/include/constants/global.h:30
-Town.GAME_LANGUAGE = 2
+-- EncounterCounter fork: GAME_LANGUAGE follows the dump (German Smaragd -> 5)
+setmetatable(Town, { __index = function(_, k)
+  if k == "GAME_LANGUAGE" then return require("src.core.game3.lang").game() end
+end })
 
 local VALUE_GROUPS = { [0] = true, [18] = true, [19] = true, [21] = true }
 

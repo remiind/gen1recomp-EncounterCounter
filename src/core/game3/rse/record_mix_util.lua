@@ -14,7 +14,10 @@ MixUtil.ORDERS = ORDERS
 
 -- pokeemerald/include/constants/global.h:20
 MixUtil.LANGUAGE_JAPANESE = 1
-MixUtil.GAME_LANGUAGE = 2
+-- EncounterCounter fork: GAME_LANGUAGE follows the dump (German Smaragd -> 5)
+setmetatable(MixUtil, { __index = function(_, k)
+  if k == "GAME_LANGUAGE" then return require("src.core.game3.lang").game() end
+end })
 
 function MixUtil.deep(v)
   if type(v) ~= "table" then return v end

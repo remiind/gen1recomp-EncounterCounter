@@ -144,13 +144,15 @@ function M.run(rom, cache, opts)
   -- pokeemerald/src/naming_screen.c:280
   local kc, keyboard = c:off(N .. "sKeyboardChars"), {}
   local pages = c.S.size(N .. "sPageColumnCounts")
-  local rows = c.S.size(N .. "sKeyboardChars") / pages / 8
+  -- KBCOL_COUNT: 8 in the US dump, 9 in the German one (sPageColumnXPos rows)
+  local cols = c.S.size(N .. "sPageColumnXPos") / pages
+  local rows = c.S.size(N .. "sKeyboardChars") / pages / cols
   for p = 0, pages - 1 do
     local page = {}
     for r = 0, rows - 1 do
       local row = {}
-      for col = 0, 7 do
-        local b = c:u8(kc + (p * rows + r) * 8 + col)
+      for col = 0, cols - 1 do
+        local b = c:u8(kc + (p * rows + r) * cols + col)
         row[col + 1] = { byte = b, char = char(c, b) }
       end
       page[r + 1] = row
@@ -162,7 +164,7 @@ function M.run(rom, cache, opts)
   for p = 0, pages - 1 do
     colCounts[p + 1] = c:u8(cc + p)
     local xs = {}
-    for col = 0, 7 do xs[col + 1] = c:u8(cx + p * 8 + col) end
+    for col = 0, cols - 1 do xs[col + 1] = c:u8(cx + p * cols + col) end
     colX[p + 1] = xs
   end
   local keyText, kt = {}, c:off(N .. "sNamingScreenKeyboardText")

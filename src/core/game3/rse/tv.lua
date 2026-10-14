@@ -13,7 +13,10 @@ Tv.EC_EMPTY_WORD = 0xFFFF
 -- pokeemerald/include/constants/global.h:20
 Tv.LANGUAGE_JAPANESE = 1
 Tv.LANGUAGE_ENGLISH = 2
-Tv.GAME_LANGUAGE = Tv.LANGUAGE_ENGLISH
+-- EncounterCounter fork: GAME_LANGUAGE follows the dump (German Smaragd -> 5)
+setmetatable(Tv, { __index = function(_, k)
+  if k == "GAME_LANGUAGE" then return require("src.core.game3.lang").game() end
+end })
 
 -- pokeemerald/include/constants/tv.h:25
 Tv.TVSHOW_OFF_AIR = 0

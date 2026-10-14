@@ -984,7 +984,8 @@ local STORY = {
   MonOTNameNotPlayer = function(ctx, adapters)
     local sess = Rse.session()
     local mon = partyOf(sess)[Rse.specialVar(ctx, VAR_0x8004) + 1]
-    if mon and (tonumber(mon.language) or GAME_LANGUAGE) ~= GAME_LANGUAGE then return boolRet(true) end
+    local gameLanguage = require("src.core.game3.lang").game()
+    if mon and (tonumber(mon.language) or gameLanguage) ~= gameLanguage then return boolRet(true) end
     local ot = tostring(mon and (mon.otName or mon.ot) or "")
     stringVar(ctx, adapters, 1, ot)
     return boolRet(ot ~= tostring(sess and (sess.name or sess.playerName) or ""))
