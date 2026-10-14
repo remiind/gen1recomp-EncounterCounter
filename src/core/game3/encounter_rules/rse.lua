@@ -196,6 +196,16 @@ function M.bind(E, H, policy)
     return MON_MALE
   end
 
+  -- pokeemerald/src/pokemon.c:2179 CreateBoxMon rolls the IVs right after the
+  -- personality, from the same Random() stream (the PID/IV link checkers verify).
+  local function roll_ivs()
+    local iv1, iv2 = Rng.Random(), Rng.Random()
+    return {
+      hp = iv1 % 32, atk = math.floor(iv1 / 32) % 32, def = math.floor(iv1 / 1024) % 32,
+      spe = iv2 % 32, spa = math.floor(iv2 / 32) % 32, spd = math.floor(iv2 / 1024) % 32,
+    }
+  end
+
   -- pokeemerald/src/wild_encounter.c:379
   local function create_wild(species, level)
     local Pokemon = require("src.core.game3.pokemon")
@@ -213,7 +223,8 @@ function M.bind(E, H, policy)
       repeat
         p = Rng.Random32()
       until p % NUM_NATURES == nature and gender_of(species, p) == want
-      return { species = species, level = level, personality = p }
+      -- EncounterCounter fork: IVs now, not at battle start (frames later)
+      return { species = species, level = level, personality = p, ivs = roll_ivs() }
     end
     local nature = pick_nature()
     local p
@@ -221,16 +232,10 @@ function M.bind(E, H, policy)
     repeat
       p = Rng.Random32()
     until p % NUM_NATURES == nature
-    local enc = { species = species, level = level, personality = p }
-    if rs then
-      -- pokeruby/src/pokemon_1.c:1445
-      local iv1, iv2 = Rng.Random(), Rng.Random()
-      enc.ivs = {
-        hp = iv1 % 32, atk = math.floor(iv1 / 32) % 32, def = math.floor(iv1 / 1024) % 32,
-        spe = iv2 % 32, spa = math.floor(iv2 / 32) % 32, spd = math.floor(iv2 / 1024) % 32,
-      }
-    end
-    return enc
+    -- pokeruby/src/pokemon_1.c:1445, pokeemerald/src/pokemon.c:2179
+    -- EncounterCounter fork: Emerald too (it rolled them at battle start, frames
+    -- later, so PID and IVs came from unrelated RNG states)
+    return { species = species, level = level, personality = p, ivs = roll_ivs() }
   end
   R.createWild = create_wild
 
