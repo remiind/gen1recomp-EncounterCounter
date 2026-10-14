@@ -456,14 +456,16 @@ pack_game_love() {
   rm -f "$LOVE_FILE"
   # tools/save-editor ships with the app: the launcher's Edit button on a save
   # row opens it in-process, so it must be inside the archive (see build.sh).
-  # Deliberately NO fused mods: a mod inside game.love sits in the read-only
+  # Fork: mods/pokecounter (encounter reports to the PokeCounter display) is
+  # the one fused mod, on by default; it can be switched off in the manager.
+  # Upstream: deliberately NO fused mods: a mod inside game.love sits in the read-only
   # APK, so the mod manager's Delete can't remove it and it reappears every
   # launch.  Pokewalker ships as an importable .zip instead, which gives it
   # a real install/upgrade/delete lifecycle.
   # The launcher UI kit lives at src/ui/kit (inside src/, packed wholesale);
   # the vendored libs/flexlove tree it replaced is gone.
   (cd "$ROOT" && zip -q -9 -r "$LOVE_FILE" \
-    main.lua conf.lua src data assets tools/save-editor \
+    main.lua conf.lua src data assets tools/save-editor mods/pokecounter \
     tools/rom_manifest.json tools/rom_manifest_blue.json \
     tools/rom_manifest_yellow.json tools/rom_manifest_gold.json \
     tools/rom_manifest_silver.json tools/rom_manifest_crystal.json \
