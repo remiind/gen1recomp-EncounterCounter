@@ -17,12 +17,14 @@ return function(V)
   local labels
   function V.SCRIPT_LABELS()
     if labels then return labels end
-    local src = require("src.import.gba.syms." .. V.GAME)
-    package.loaded["src.import.gba.syms." .. V.GAME] = nil
+    local src = require("src.import.gba.syms." .. (V.BUILD or V.GAME))
+    package.loaded["src.import.gba.syms." .. (V.BUILD or V.GAME)] = nil
     local list = {}
     for name, off in src.data:gmatch("([^ \n]+) (%x+) ") do
       if (name:find("EventScript", 1, true) or name:match("Script$"))
-          and not name:find("BattleScript", 1, true) and not name:find("Movement", 1, true) then
+          and not name:find("BattleScript", 1, true) and not name:find("Movement", 1, true)
+          -- gMysteryEventScriptCmdTable is a function pointer table, not a script
+          and not name:find("CmdTable", 1, true) then
         list[#list + 1] = { name = name, off = tonumber(off, 16) }
       end
     end

@@ -56,6 +56,7 @@ end
 
 -- pokeemerald/src/credits.c:1280
 local function the_end_map(rom, C)
+  if C.theEndTilemapLz then return lz(rom, C.theEndTilemapLz) end
   local entries = {}
   for i = 0, 32 * 32 - 1 do entries[i] = 1 end
   local letters = { { C.letterT, 3 }, { C.letterH, 7 }, { C.letterE, 11 }, { C.letterE, 16 }, { C.letterN, 20 }, { C.letterD, 24 } }
@@ -127,7 +128,7 @@ function M.run(rom, cache, opts)
   local backdrop = string.char(r, g, b, 255)
   put("the_end.rgba", opaque(BgBake.bakeRegionRgba(endGfx, copyPal, the_end_map(rom, C), W, H, { alpha0 = true }), backdrop))
   local blankEntries = {}
-  for i = 0, 32 * 32 - 1 do blankEntries[i] = 1 end
+  for i = 0, 32 * 32 - 1 do blankEntries[i] = C.blankTile or 1 end
   put("the_end_blank.rgba", opaque(BgBake.bakeRegionRgba(endGfx, copyPal, map_bytes(blankEntries), W, H, { alpha0 = true }), backdrop))
 
   -- pokeemerald/src/credits.c:547

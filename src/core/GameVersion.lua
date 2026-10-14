@@ -153,6 +153,8 @@ GameVersion.VERSIONS = {
     sha1 = "f3ae088181bf583e55daf962a92bb46f4f1d07b7",
     revisions = {
       { sha1 = "f3ae088181bf583e55daf962a92bb46f4f1d07b7", label = "1.0" },
+      -- EncounterCounter fork: German "Smaragd-Edition"
+      { sha1 = "61c2eb2b380b1a75f0c94b767a2d4c26cd7ce4e3", label = "DE" },
     },
     manifest = "tools/rom_manifest_emerald.json",
     cachePrefix = "emerald/", saveSuffix = "_emerald",

@@ -55,12 +55,25 @@ local function row(t, game, name, what)
 end
 
 local instances = {}
+-- Localized dumps (EncounterCounter fork: German Emerald) have their own symbol
+-- table; callers that ask for the game id get the table of the selected dump.
+local buildFor = {}
+
+function Syms.setBuild(game, build)
+  buildFor[game] = (build ~= game) and build or nil
+end
+
+function Syms.buildOf(game)
+  return buildFor[game] or game
+end
 
 function Syms.of(game)
   assert(type(game) == "string" and game ~= "", "Syms.of needs a game id")
+  local id = game
+  game = buildFor[game] or game
   local S = instances[game]
   if S then return S end
-  S = { game = game }
+  S = { game = game, id = id }
 
   local function data() return lazy(game, "") end
   local function funcs() return lazy(game, "_funcs") end

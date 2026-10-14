@@ -1,6 +1,15 @@
 local VersionsRse = require("src.import.gba.versions_rse")
+local Syms = require("src.import.gba.syms")
 
-local V = VersionsRse.new("emerald")
+-- EncounterCounter fork: Emerald is a family of dumps (US 1.0, German), each
+-- with its own symbol table, selected by SHA-1 like the Ruby/Sapphire revisions.
+local BUILDS = {
+  { build = "emerald", label = "1.0", id = "emerald_1_0", sha1 = "f3ae088181bf583e55daf962a92bb46f4f1d07b7" },
+  { build = "emerald_de", label = "DE", id = "emerald_de", sha1 = "61c2eb2b380b1a75f0c94b767a2d4c26cd7ce4e3" },
+}
+
+local function tables(revision)
+local V = VersionsRse.new("emerald", revision.build)
 local sym, count = V.sym, V.count
 
 V.CACHE_VERSION = 22
@@ -188,8 +197,11 @@ V.BATTLE_STRINGS_TABLE = sym("gBattleStringsTable")
 V.BATTLE_STRINGS_COUNT = count("gBattleStringsTable", 4)
 
 local ROW = {
-  id = "emerald_1_0",
+  id = revision.id,
   game = "emerald",
+  build = revision.build,
+  revision = revision.label,
+  sha1 = revision.sha1,
   tilesets = {},
   layouts = {},
   map_headers = {},
@@ -201,7 +213,7 @@ local ROW = {
   num_obj_event_gfx = V.NUM_OBJ_EVENT_GFX,
 }
 
-V.BY_SHA1["f3ae088181bf583e55daf962a92bb46f4f1d07b7"] = ROW
+V.BY_SHA1[revision.sha1] = ROW
 
 local AREAS = {
   "maps", "scripts", "data", "pokemon_gfx", "text", "ow", "field", "battle", "audio", "boot", "ui", "rse",
@@ -219,3 +231,55 @@ for _, area in ipairs(AREAS) do
 end
 
 return V
+end
+
+local byHash, loaded = {}, {}
+for _, revision in ipairs(BUILDS) do byHash[revision.sha1] = revision end
+local selectedRevision = BUILDS[1]
+
+local function resolve(identity)
+  -- the bare game id keeps the dump that was selected by SHA-1 (US by default)
+  if identity == "emerald" then return selectedRevision end
+  local hash = type(identity) == "string" and identity:lower():gsub("%s+", "") or nil
+  return hash and byHash[hash] or nil
+end
+
+local function load(revision)
+  local V = loaded[revision.build]
+  if not V then
+    -- the area fragments ask Syms.of("emerald") directly: point it at this dump while building
+    Syms.setBuild("emerald", revision.build)
+    local ok, res = pcall(tables, revision)
+    Syms.setBuild("emerald", selectedRevision.build)
+    if not ok then error(res, 0) end
+    V = res
+    loaded[revision.build] = V
+  end
+  return V
+end
+
+local function selected() return load(selectedRevision) end
+
+local facade = { BUILDS = BUILDS }
+
+function facade.select(identity)
+  local revision = resolve(identity)
+  if not revision then error("versions(emerald): unknown identity " .. tostring(identity), 2) end
+  selectedRevision = revision
+  Syms.setBuild("emerald", revision.build)
+  load(revision)
+end
+
+function facade.lookup(identity)
+  local revision = resolve(identity)
+  if not revision then return nil, "unsupported or unknown emerald dump SHA-1" end
+  return load(revision).BY_SHA1[revision.sha1]
+end
+facade.lookupSha1 = facade.lookup
+
+function facade.selectedBuild() return selectedRevision.build end
+
+return setmetatable(facade, {
+  __index = function(_, key) return selected()[key] end,
+  __newindex = function(_, key, value) selected()[key] = value end,
+})

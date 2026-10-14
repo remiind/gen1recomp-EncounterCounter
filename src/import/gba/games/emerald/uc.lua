@@ -116,11 +116,6 @@ return function(V)
     pageCount = count("credits.o:sCreditsEntryPointerTable", 5 * 4),
     palette = sym("credits.o:sCredits_Pal"),
     theEndGfx = sym("credits.o:sCreditsCopyrightEnd_Gfx"),
-    letterT = sym("credits.o:sTheEnd_LetterMap_T"),
-    letterH = sym("credits.o:sTheEnd_LetterMap_H"),
-    letterE = sym("credits.o:sTheEnd_LetterMap_E"),
-    letterN = sym("credits.o:sTheEnd_LetterMap_N"),
-    letterD = sym("credits.o:sTheEnd_LetterMap_D"),
     copyrightPal = sym("gIntroCopyright_Pal"),
     grassGfx = sym("gBirchBagGrass_Gfx"),
     grassMap = sym("gBirchGrassTilemap"),
@@ -132,4 +127,18 @@ return function(V)
     monSpritePos = sym("credits.o:sMonSpritePos"),
     monSpritePosCount = count("credits.o:sMonSpritePos", 2),
   }
+  -- EncounterCounter fork: the German dump draws "ENDE" from one compressed
+  -- tilemap (and fills with tile 0) instead of the five THE END letter maps
+  local S = require("src.import.gba.syms").of("emerald")
+  if S.has("credits.o:sTheEnd_LetterMap_T") then
+    local C = V.CREDITS_RSE
+    C.letterT = sym("credits.o:sTheEnd_LetterMap_T")
+    C.letterH = sym("credits.o:sTheEnd_LetterMap_H")
+    C.letterE = sym("credits.o:sTheEnd_LetterMap_E")
+    C.letterN = sym("credits.o:sTheEnd_LetterMap_N")
+    C.letterD = sym("credits.o:sTheEnd_LetterMap_D")
+  else
+    V.CREDITS_RSE.theEndTilemapLz = sym("credits.o:sTheEnd_Tilemap_DE")
+    V.CREDITS_RSE.blankTile = 0
+  end
 end

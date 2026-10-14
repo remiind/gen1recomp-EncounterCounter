@@ -1,0 +1,85 @@
+{
+ "set": [
+  {
+   "name": "DewfordTown_Hall_EventScript_ReceivedSludgeBomb",
+   "de": "0x1ffec2"
+  },
+  {
+   "name": "gContestResultsTitle_Normal_Tilemap",
+   "de": "0xdc6504",
+   "size": "0x30"
+  },
+  {
+   "name": "gContestResultsTitle_Super_Tilemap",
+   "de": "0xdc6534",
+   "size": "0x30"
+  },
+  {
+   "name": "gContestResultsTitle_Hyper_Tilemap",
+   "de": "0xdc6564",
+   "size": "0x30"
+  },
+  {
+   "name": "gContestResultsTitle_Master_Tilemap",
+   "de": "0xdc6594",
+   "size": "0x30"
+  },
+  {
+   "name": "gContestResultsTitle_Link_Tilemap",
+   "de": "0xdc65c4",
+   "size": "0x30"
+  },
+  {
+   "name": "gContestResultsTitle_Cool_Tilemap",
+   "de": "0xdc65f4",
+   "size": "0x1c"
+  },
+  {
+   "name": "gContestResultsTitle_Beauty_Tilemap",
+   "de": "0xdc6610",
+   "size": "0x1c"
+  },
+  {
+   "name": "gContestResultsTitle_Cute_Tilemap",
+   "de": "0xdc662c",
+   "size": "0x1c"
+  },
+  {
+   "name": "gContestResultsTitle_Smart_Tilemap",
+   "de": "0xdc6648",
+   "size": "0x1c"
+  },
+  {
+   "name": "gContestResultsTitle_Tough_Tilemap",
+   "de": "0xdc6664",
+   "size": "0x1c"
+  },
+  {
+   "name": "sCreditsCopyrightEnd_Gfx",
+   "obj": "credits.o",
+   "de": "0xde4088"
+  },
+  {
+   "name": "sCreditsEntryPointerTable",
+   "obj": "credits.o",
+   "de": "0x5f7b00",
+   "size": "0x44c"
+  }
+ ],
+ "drop": [
+  "sEmpty3",
+  "sTheEnd_LetterMap_T",
+  "sTheEnd_LetterMap_H",
+  "sTheEnd_LetterMap_E",
+  "sTheEnd_LetterMap_N",
+  "sTheEnd_LetterMap_D"
+ ],
+ "add": [
+  {
+   "name": "sTheEnd_Tilemap_DE",
+   "obj": "credits.o",
+   "de": "0xde4290",
+   "size": "0x200"
+  }
+ ]
+}

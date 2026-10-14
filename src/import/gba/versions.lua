@@ -54,6 +54,13 @@ function Versions.forGame(id)
 end
 
 function Versions.selectCache(id, cache)
+  if id == "emerald" then
+    -- EncounterCounter fork: pick the dump (US or German) the cache was built from
+    local raw = cache and cache:read("data/generated/gba/meta.json")
+    local sha1 = type(raw) == "string" and raw:match('"romSha1"%s*:%s*"([%x]+)"') or nil
+    if sha1 and GameVersion.acceptsSha1(id, sha1:lower()) then return Versions.select(sha1:lower()) end
+    return Versions.select(id)
+  end
   if id ~= "ruby" and id ~= "sapphire" then return Versions.select(id) end
   local raw = cache and cache:read("data/generated/gba/meta.json")
   assert(type(raw) == "string", "versions: missing native " .. id .. " cache identity")
