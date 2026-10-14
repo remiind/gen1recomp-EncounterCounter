@@ -34,6 +34,13 @@ jobs:
           yes | "$SDK/cmdline-tools/latest/bin/sdkmanager" --licenses > /dev/null || true
           "$SDK/cmdline-tools/latest/bin/sdkmanager" "platforms;android-36" "build-tools;36.0.0" "ndk;25.2.9519653" > /dev/null
 
+      # Fixed debug key: every run signs with the same certificate, so a new
+      # APK installs over the previous one (keeps saves and the ROM cache).
+      - name: Use the fork's debug keystore
+        run: |
+          mkdir -p ~/.android
+          cp mobile/fork/debug.keystore ~/.android/debug.keystore
+
       - name: Build APK
         env:
           GEN1RECOMP_APP_NAME: "gen1recomp DE"
