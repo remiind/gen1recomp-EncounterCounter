@@ -397,6 +397,9 @@ end
 -- accident.  Boot.run and Prelaunch.updateAllowed both ask this one function,
 -- so the boot gate and the --update gate cannot disagree.
 function Boot.canUpdateInPlace()
+  -- EncounterCounter fork: never pull an upstream payload over this build (it
+  -- would drop the German ROM support). Updates come from the fork's releases.
+  if os.getenv("POKEPORT_FORK_ALLOW_UPDATES") ~= "1" then return false end
   -- Catalogue packages are updated by PortMaster, not the standalone updater.
   if os.getenv("POKEPORT_PORTMASTER_MANAGED") == "1" then return false end
   local fs = love and love.filesystem
