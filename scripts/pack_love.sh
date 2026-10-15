@@ -47,7 +47,7 @@ rm -f "$OUTPUT"
 # The launcher UI kit lives at src/ui/kit (inside src/, packed wholesale);
 # the vendored libs/flexlove tree it replaced is gone.
 (cd "$ROOT" && zip -q -9 -r "$OUTPUT" \
-  main.lua conf.lua src data assets tools/save-editor mods/pokecounter \
+  main.lua conf.lua src data assets tools/save-editor mods/pokecounter mods/big_bag \
   tools/rom_manifest.json tools/rom_manifest_blue.json \
   tools/rom_manifest_yellow.json tools/rom_manifest_gold.json \
   tools/rom_manifest_silver.json tools/rom_manifest_crystal.json \

@@ -1,0 +1,17 @@
+{
+  "id": "big_bag",
+  "name": "Big Bag",
+  "version": "1.0.0",
+  "api": 2,
+  "entry": "main.lua",
+  "profile": "content",
+  "category": "QOL",
+  "game_version": ">=0.0.0-0 <2.0.0",
+  "priority": 100,
+  "games": ["emerald", "ruby", "sapphire", "firered", "leafgreen"],
+  "dependencies": [],
+  "optional_dependencies": [],
+  "conflicts": [],
+  "permissions": ["engine_internals"],
+  "description": "Gen 3: every bag pocket and the PC item storage hold up to 999 different items. Stack sizes stay as on the cartridge. A cartridge .sav export keeps only the original number of slots per pocket."
+}
