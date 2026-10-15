@@ -1,7 +1,7 @@
 {
   "id": "pokecounter",
   "name": "PokeCounter",
-  "version": "1.5.0",
+  "version": "1.6.0",
   "api": 2,
   "entry": "main.lua",
   "profile": "content",
@@ -22,5 +22,5 @@
     "network",
     "engine_internals"
   ],
-  "description": "Reports every wild encounter to the PokeCounter display (UDP 4210, like the EncounterCounter emulators) and pauses the game on a shiny until START or SELECT is held for 2 seconds. F10 starts a soft-reset auto-hunt for a static Pokémon."
+  "description": "Reports every wild encounter to the PokeCounter display (UDP 4210, like the EncounterCounter emulators) and pauses the game on a shiny until START or SELECT is held for 2 seconds. F10 starts a soft-reset auto-hunt for a static Pokémon, F11 one for a starter or gift Pokémon."
 }

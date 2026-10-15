@@ -20,4 +20,12 @@ using the same UDP protocol as the EncounterCounter forks of mGBA and melonDS
   shiny, as fast as the PC allows and muted. It never saves. A shiny stops it
   and the shiny pause holds the game; three resets in a row without a battle
   (2 minutes of game time each) stop it too. F10 again stops it by hand.
+- Starter / gift hunt (F11): the same loop, but the result is the Pokémon
+  that joins the party (starter, Lapras, Eevee, fossils, Castform, Beldum ...).
+  Save where the gift is handed over - FireRed/LeafGreen: in Oak's lab facing
+  the Poke Ball; Emerald/Ruby/Sapphire: in Littleroot facing Route 101 - and
+  press F11. Between the A presses the hunt presses the direction the player
+  faced at F11. Option "STARTER (RSE)" picks the ball on Birch's bag screen
+  (LINKS / MITTE / RECHTS). The party needs a free slot; wild battles are not
+  counted during a gift hunt.
 - Ships inside game.love of the fork's Windows and Android builds.

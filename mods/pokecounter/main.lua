@@ -25,7 +25,9 @@ return function(mod)
     { key = "host", label = "DISPLAY IP", type = "text", default = "", maxLen = 15 },
     { key = "status", label = "STATUS MESSAGES", type = "toggle", default = true },
     { key = "team", label = "SEND TEAM", type = "toggle", default = true },
-    { key = "hunt", label = "AUTO-HUNT (F10)", type = "toggle", default = true },
+    { key = "hunt", label = "AUTO-HUNT (F10/F11)", type = "toggle", default = true },
+    { key = "starter", label = "STARTER (RSE)", type = "choice", default = "1",
+      choices = { { "0", "LINKS" }, { "1", "MITTE" }, { "2", "RECHTS" } } },
   })
 
   local function now()
@@ -354,6 +356,7 @@ return function(mod)
 
   -- ---------------------------------------------------------- encounters
   local encSeq, lastShiny = 0, false   -- every reported wild Pokémon (auto-hunt)
+  local hunt = nil                     -- running auto-hunt (see below)
 
   local function packIvs(ivs)
     if type(ivs) ~= "table" then return 0 end
@@ -393,6 +396,7 @@ return function(mod)
 
   mod.events:on("battle.started", function(ev)
     if type(ev) ~= "table" or ev.kind ~= "wild" then return end
+    if hunt and hunt.mode == "gift" then return end   -- gift hunt: only the new party Pokémon counts
     local st = ev.battle
     local mon = st and st.enemy and st.enemy.mon
     if type(mon) ~= "table" then return end
@@ -559,12 +563,13 @@ return function(mod)
   local HUNT_SPEED = 64             -- logic steps per frame, capped by the frame's time budget
   local HUNT_TIMEOUT_TICKS = 120 * 60
   local HUNT_MAX_TIMEOUTS = 3
-  local hunt = nil
 
   local function huntRestart(game)
     hunt.ticks = 0
     hunt.nextTap = love.math.random(0, 120)   -- own start delay -> own RNG state per reset
     hunt.encSeen = encSeq
+    hunt.base = nil                            -- party size, read again after "Continue"
+    hunt.tapCount = 0
     game.softResetRequested = true             -- handled at the next logic step (Game3:fixedUpdate)
   end
 
@@ -584,26 +589,81 @@ return function(mod)
     log("auto-hunt stopped (%s) after %d resets", why, n)
   end
 
-  local function huntStart(game)
+  local function huntStart(game, mode)
     if held or shinyAt then
       toast("Auto-Jagd: erst das Shiny bestaetigen (START/SELECT halten)")
       return
     end
     if not game.boot and not game.session then return end
+    local dir = nil
+    if mode == "gift" then
+      -- the direction the player faces now: pressed between the A presses,
+      -- so a save in Littleroot walks onto Route 101 (Emerald) and a save in
+      -- front of a Poke Ball only bumps into the table (FireRed)
+      if game.phase ~= "field" or not game.session then
+        toast("Starter-Jagd: im Spiel vor dem Pokeball / Startpunkt F11 druecken")
+        return
+      end
+      local Player = engine("src.core.game3.player")
+      dir = Player and Player.facing or "up"
+      if #(game.session.party or {}) >= 6 then
+        toast("Starter-Jagd: im Team muss ein Platz frei sein")
+        return
+      end
+    end
     local okV, vol = pcall(love.audio.getVolume)
     hunt = {
+      mode = mode or "static", dir = dir,
       resets = 0, timeouts = 0, startedAt = now(),
       prevSpeed = game.speedOverride, prevVolume = okV and vol or 1,
     }
     game.speedOverride = HUNT_SPEED
     pcall(love.audio.setVolume, 0)
-    toast("Auto-Jagd AN: Reset, A druecken, Shiny pruefen - F10 beendet")
-    log("auto-hunt started")
+    if hunt.mode == "gift" then
+      toast("Starter-Jagd AN: Reset, auswaehlen, Shiny pruefen - F11 beendet")
+    else
+      toast("Auto-Jagd AN: Reset, A druecken, Shiny pruefen - F10 beendet")
+    end
+    log("auto-hunt started (%s)", hunt.mode)
     huntRestart(game)
   end
 
-  local function huntToggle(game)
-    if hunt then huntStop(game, "user") else huntStart(game) end
+  local function huntToggle(game, mode)
+    if hunt then huntStop(game, "user") else huntStart(game, mode) end
+  end
+
+  -- gift hunt: a new Pokémon in the party (starter, gift) is the result
+  local function giftCheck(game)
+    local s = game.session
+    if game.phase ~= "field" or type(s) ~= "table" or type(s.party) ~= "table" then return end
+    local n = #s.party
+    if hunt.base == nil then hunt.base = n return end
+    if n > hunt.base then
+      hunt.base = n
+      local mon = s.party[n]
+      if type(mon) == "table" then report(mon) end
+    end
+  end
+
+  -- next button for the gift hunt: Emerald/Ruby/Sapphire starter screen ->
+  -- move to the chosen ball, else A and the saved facing direction in turn
+  local function isRse(game)
+    local v = game and game.session and game.session.version
+    return v == "emerald" or v == "ruby" or v == "sapphire"
+  end
+
+  local function giftButton(game)
+    local SC = isRse(game) and engine("src.ui.game3.rse.starter_choose") or nil
+    local scr = SC and SC.isOpen and SC.isOpen() and SC.active and SC.active()
+    if scr and scr.state == "input" then
+      local want = tonumber(mod.options:get("starter")) or 1
+      if (scr.selection or 1) < want then return "right" end
+      if (scr.selection or 1) > want then return "left" end
+      return "a"
+    end
+    hunt.tapCount = (hunt.tapCount or 0) + 1
+    if hunt.dir and hunt.tapCount % 2 == 0 then return hunt.dir end
+    return "a"
   end
 
   -- every logic tick: battle seen -> shiny? / timeout
@@ -631,6 +691,10 @@ return function(mod)
 
   -- one game logic tick: count it, press A (B during the quest log replay)
   mod.hooks:wrap("input.step", function(next, game, dt)
+    if hunt and not held and hunt.mode == "gift" then
+      local okG, errG = pcall(giftCheck, game)
+      if not okG then log("gift hunt: %s", tostring(errG)) end
+    end
     if hunt and not held then
       local okH, errH = pcall(huntCheck, game)
       if not okH then
@@ -641,7 +705,8 @@ return function(mod)
     if hunt and not held then
       hunt.ticks = hunt.ticks + 1
       if hunt.ticks >= hunt.nextTap then
-        mod.input:tap(game, game.phase == "quest_log" and "b" or "a")
+        local btn = game.phase == "quest_log" and "b" or (hunt.mode == "gift" and giftButton(game) or "a")
+        mod.input:tap(game, btn)
         hunt.nextTap = hunt.ticks + love.math.random(8, 30)
       end
     end
@@ -686,8 +751,13 @@ return function(mod)
   -- While held, presses never reach the game (no buffered A press after the
   -- resume, no F1/F2 save hotkeys); releases still do, so nothing sticks.
   mod.hooks:wrap("input.key", function(next, game, ev)
-    if ev and ev.phase == "pressed" and ev.key == "f10" and mod.options:get("hunt") ~= false then
-      huntToggle(game)
+    if ev and ev.phase == "pressed" and (ev.key == "f10" or ev.key == "f11")
+        and mod.options:get("hunt") ~= false then
+      if hunt and ((hunt.mode == "gift") ~= (ev.key == "f11")) then
+        huntStop(game, "user")             -- the other key stops a running hunt too
+      else
+        huntToggle(game, ev.key == "f11" and "gift" or "static")
+      end
       return true
     end
     if held and ev and ev.phase == "pressed" then return true end
@@ -730,7 +800,9 @@ return function(mod)
     if hunt then
       local f = font(gh * 0.03)
       local mins = math.max(1 / 60, (t - hunt.startedAt) / 60)
-      local line = string.format("AUTO-JAGD  %d Resets  %.0f/h  (F10 = aus)", hunt.resets, hunt.resets / mins * 60)
+      local line = string.format("%s  %d Resets  %.0f/h  (%s = aus)",
+        hunt.mode == "gift" and "STARTER-JAGD" or "AUTO-JAGD", hunt.resets, hunt.resets / mins * 60,
+        hunt.mode == "gift" and "F11" or "F10")
       g.push("all")
       g.setFont(f)
       g.setColor(0, 0, 0, 0.6)
