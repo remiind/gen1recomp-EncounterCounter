@@ -620,9 +620,9 @@ return function(mod)
     game.speedOverride = HUNT_SPEED
     pcall(love.audio.setVolume, 0)
     if hunt.mode == "gift" then
-      toast("Starter-Jagd AN: Reset, auswaehlen, Shiny pruefen - F11 beendet")
+      toast("Starter-Jagd AN: setzt zurueck, bis ein Shiny kommt - F11 beendet")
     else
-      toast("Auto-Jagd AN: Reset, A druecken, Shiny pruefen - F10 beendet")
+      toast("Auto-Jagd AN: setzt zurueck, bis ein Shiny kommt - F10 beendet")
     end
     log("auto-hunt started (%s)", hunt.mode)
     huntRestart(game)
