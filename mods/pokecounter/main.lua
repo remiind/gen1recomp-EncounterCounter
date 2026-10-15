@@ -13,11 +13,12 @@
 -- audio stop. Holding START or SELECT for 2 seconds resumes.
 return function(mod)
   local PORT = 4210
-  local RETRY_S = 0.4
-  local MAX_TRIES = 8
+  local RETRY_S = 0.4      -- first retries; slows down to RETRY_MAX_S
+  local RETRY_MAX_S = 2.0
+  local OUTAGE_S = 8       -- no answer this long: tell the player (once)
   local SHINY_WAIT_S = 1.5
   local RESUME_HOLD_S = 2.0
-  local QUEUE_MAX = 16
+  local QUEUE_MAX = 500    -- reports wait here until the display confirms them
 
   mod.options:define({
     { key = "autopause", label = "SHINY AUTO-PAUSE", type = "toggle", default = true },
@@ -120,6 +121,9 @@ return function(mod)
   local startedAt = now()
   local warnedMissing = false
   local queue = {}
+  local ACK_GAP_S = 0.3
+  local dirty = false          -- queue changed, write it to mod.storage
+  local outageSince, outageWarned = nil, false
 
   local MDNS_QUERY = string.char(
     0x12, 0x34, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0,
@@ -226,12 +230,24 @@ return function(mod)
         if not learnedIp then toast("PokeCounter verbunden (" .. tostring(ip) .. ")") end
         learnedIp = ip
         local head = queue[1]
-        -- a reply right after a startup ping may be the ping's answer: keep
-        -- the report then (the display drops repeats by eid)
+        -- A reply only confirms the head once the head itself went out, and
+        -- not right after a ping (could be the ping's answer). Late answers
+        -- to a report's repeats arrive while the next one is held back
+        -- (ACK_GAP_S) and are ignored. The display drops repeats by eid, so
+        -- an extra send never counts twice.
         local pingReply = head and head.firstSent and head.firstSent - pingAt < 0.5 and now() - pingAt < 0.5
-        if head and not pingReply and data:find('"ok"', 1, true) then
-          local done = table.remove(queue, 1)
-          if done.label then toast("PokeCounter: " .. done.label .. " gemeldet") end
+        if head and head.firstSent and not pingReply and data:find('"ok"', 1, true) then
+          table.remove(queue, 1)
+          dirty = true
+          local t = now()
+          if outageWarned then
+            outageWarned = false
+            toast("PokeCounter: wieder verbunden, " .. (#queue + 1) .. " Meldung(en) nachgeliefert")
+          end
+          outageSince = nil
+          if queue[1] then
+            queue[1].nextAt = math.max(queue[1].nextAt or 0, t + ACK_GAP_S)
+          end
         end
       end
     end
@@ -251,23 +267,29 @@ return function(mod)
     end
     local p = queue[1]
     if not p or t < p.nextAt then return end
-    if p.tries >= MAX_TRIES then
-      log("no reply from display, dropping: %s", p.json)
-      toast("PokeCounter: keine Antwort vom Display")
-      learnedIp = nil -- fall back to mDNS / broadcast
-      table.remove(queue, 1)
-      return
+    -- Never give up on a report: Wi-Fi on handhelds drops out for seconds
+    -- (power save, background scans), and the display counts a late report
+    -- just as well. Retries slow down while it stays quiet.
+    if p.firstSent and t - p.firstSent > OUTAGE_S then
+      if not outageSince then outageSince = p.firstSent end
+      if not outageWarned then
+        outageWarned = true
+        toast("PokeCounter: Display antwortet nicht, Meldungen werden nachgeschickt (" .. #queue .. ")")
+      end
+      -- a display that came back with a new address is found again
+      if not configuredHost() and t - outageSince > 15 then learnedIp = nil end
     end
     sendDatagram(p.json)
     p.firstSent = p.firstSent or t
     p.tries = p.tries + 1
-    p.nextAt = t + RETRY_S
+    p.nextAt = t + math.min(RETRY_MAX_S, RETRY_S * (1 + math.floor(p.tries / 6)))
   end
 
   local function enqueue(json, label)
     if not netInit() then return end
     if #queue >= QUEUE_MAX then table.remove(queue, 1) end
     queue[#queue + 1] = { json = json, tries = 0, nextAt = 0, label = label }
+    dirty = true
     pump() -- first try right away
   end
 
@@ -365,9 +387,42 @@ return function(mod)
     if not ok then log("report failed: %s", tostring(err)) end
   end)
 
+  -- Reports still waiting survive closing the app: kept in mod.storage
+  -- (per playthrough) and sent on the next start.
+  local restored = false
+  local function persist(game)
+    if not restored then
+      restored = true
+      local ok, saved = pcall(function() return mod.storage:read(game, "pending") end)
+      if ok and type(saved) == "table" and type(saved.items) == "table" and #saved.items > 0 then
+        local have = {}
+        for _, q in ipairs(queue) do have[q.json] = true end
+        local back = {}
+        for _, it in ipairs(saved.items) do
+          if type(it) == "table" and type(it.json) == "string" and not have[it.json] then
+            back[#back + 1] = { json = it.json, label = it.label, tries = 0, nextAt = 0 }
+          end
+        end
+        for i = #back, 1, -1 do table.insert(queue, 1, back[i]) end
+        if #back > 0 then
+          netInit()
+          toast("PokeCounter: " .. #back .. " offene Meldung(en) vom letzten Mal werden nachgeschickt")
+          dirty = true
+        end
+      end
+    end
+    if dirty then
+      dirty = false
+      local items = {}
+      for i, q in ipairs(queue) do items[i] = { json = q.json, label = q.label } end
+      pcall(function() mod.storage:write(game, "pending", { format = 1, items = items }) end)
+    end
+  end
+
   -- ------------------------------------------------------------- hooks
   mod.hooks:wrap("core.update", function(next, game, dt)
     pump()
+    persist(game)
     if shinyAt and not held then
       if #queue == 0 or now() - shinyAt >= SHINY_WAIT_S or not udp then
         startHold()
