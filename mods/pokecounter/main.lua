@@ -21,7 +21,7 @@ return function(mod)
 
   mod.options:define({
     { key = "autopause", label = "SHINY AUTO-PAUSE", type = "toggle", default = true },
-    { key = "host", label = "DISPLAY IP (EMPTY = AUTO)", type = "text", default = "", maxLen = 15 },
+    { key = "host", label = "DISPLAY IP", type = "text", default = "", maxLen = 15 },
     { key = "status", label = "STATUS MESSAGES", type = "toggle", default = true },
   })
 
@@ -114,6 +114,7 @@ return function(mod)
   local udp
   local netTried = false
   local learnedIp, mdnsIp, mdnsAt = nil, nil, -1e9
+  local localIp = nil
   local subnetBroadcast = nil -- a.b.c.255 of the local address (some Wi-Fi stacks drop 255.255.255.255)
   local pingAt = -1e9
   local startedAt = now()
@@ -131,13 +132,19 @@ return function(mod)
       toast("PokeCounter: kein Netzwerk (LuaSocket fehlt)")
       return false
     end
-    local u = socket.udp()
-    if not u then return false end
+    -- IPv4 explicitly: a plain udp() bound to "*" can become an IPv6 socket
+    -- (Android lists :: first), and then every IPv4 sendto fails
+    local newUdp = socket.udp4 or socket.udp
+    local u, uerr = newUdp()
+    if not u then
+      toast("PokeCounter: UDP-Socket nicht moeglich (" .. tostring(uerr) .. ")")
+      return false
+    end
     u:settimeout(0)
     -- bind first: SO_BROADCAST on a socket without a descriptor fails
-    local ok = u:setsockname("*", 0)
+    local ok, berr = u:setsockname("0.0.0.0", 0)
     if not ok then
-      toast("PokeCounter: UDP-Socket nicht moeglich")
+      toast("PokeCounter: UDP-Socket nicht moeglich (" .. tostring(berr) .. ")")
       pcall(function() u:close() end)
       return false
     end
@@ -145,12 +152,13 @@ return function(mod)
     -- local address without sending anything: a connected UDP socket knows
     -- which interface it would use
     pcall(function()
-      local probe = socket.udp()
+      local probe = newUdp()
       probe:setpeername("192.0.2.1", 9)
       local ip = probe:getsockname()
       probe:close()
       local a, b, c = tostring(ip or ""):match("^(%d+)%.(%d+)%.(%d+)%.%d+$")
       if a and ip ~= "0.0.0.0" and a ~= "127" then
+        localIp = ip
         subnetBroadcast = a .. "." .. b .. "." .. c .. ".255"
         log("local address %s, subnet broadcast %s", ip, subnetBroadcast)
       end
@@ -168,19 +176,35 @@ return function(mod)
     return nil
   end
 
+  -- sendto with the error on screen (once per kind), so a blocked network
+  -- shows up as a reason instead of a silent "no answer"
+  local sendErrors = {}
+  local function send(data, ip, port, quiet)
+    local ok, err = udp:sendto(data, ip, port)
+    if not ok then
+      local key = ip .. "|" .. tostring(err)
+      if not sendErrors[key] then
+        sendErrors[key] = true
+        log("sendto %s:%d failed: %s", ip, port, tostring(err))
+        if not quiet then toast("PokeCounter: Senden an " .. ip .. " fehlgeschlagen (" .. tostring(err) .. ")") end
+      end
+    end
+    return ok
+  end
+
   local function sendMdns()
     mdnsAt = now()
-    if udp then udp:sendto(MDNS_QUERY, "224.0.0.251", 5353) end
+    if udp then send(MDNS_QUERY, "224.0.0.251", 5353, true) end
   end
 
   local function sendDatagram(json)
     local to = configuredHost() or learnedIp or mdnsIp
     if to then
-      udp:sendto(json, to, PORT)
+      send(json, to, PORT)
       return
     end
-    udp:sendto(json, "255.255.255.255", PORT)
-    if subnetBroadcast then udp:sendto(json, subnetBroadcast, PORT) end
+    send(json, "255.255.255.255", PORT)
+    if subnetBroadcast then send(json, subnetBroadcast, PORT) end
   end
 
   local function pump()
@@ -429,5 +453,7 @@ return function(mod)
 
   if netInit() then sendMdns() end
   log("PokeCounter active (%s)", gameCode())
-  toast("PokeCounter aktiv, suche Display ...")
+  local fixed = configuredHost()
+  toast("PokeCounter aktiv (eigene IP " .. tostring(localIp or "?") .. ")"
+    .. (fixed and (", sende an " .. fixed) or ", suche Display ..."))
 end
