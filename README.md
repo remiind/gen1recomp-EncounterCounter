@@ -109,6 +109,16 @@ SHA-1 before creating any game data. FireRed, LeafGreen, Ruby, Sapphire, and Eme
 | Sapphire | 1.1 | 16 MiB | `4722efb8cd45772ca32555b98fd3b9719f8e60a9` |
 | Sapphire | 1.2 | 16 MiB | `89b45fb172e6b55d51fc0e61989775187f6fe63c` |
 
+EncounterCounter fork: the German dumps below are accepted as well (address
+tables in `src/import/gba/syms/emerald_de*.lua` and
+`src/import/gba/editions/*_de.lua`, see `tools/de/README.md`).
+
+| Game | Revision | ROM size | SHA-1 |
+| --- | --- | --- | --- |
+| Smaragd-Edition | DE | 16 MiB | `61c2eb2b380b1a75f0c94b767a2d4c26cd7ce4e3` |
+| Feuerrote Edition | DE 1.0 | 16 MiB | `18a3758ceeef2c77b315144be2c3910d6f1f69fe` |
+| Blattgrüne Edition | DE 1.0 | 16 MiB | `0802d1fb185ee3ed48d9a22afb25e66424076dac` |
+
 **Platform notes:** [Linux](docs/platforms/linux.md),
 [iOS](docs/platforms/ios.md), [Xbox Dev Mode](docs/platforms/xbox.md),
 [handhelds](docs/platforms/handhelds.md),
