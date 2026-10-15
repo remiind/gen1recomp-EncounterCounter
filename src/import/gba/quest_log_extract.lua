@@ -160,7 +160,20 @@ local function read(rom,off)
   end
   error('Unterminated Quest Log string')
 end
+-- EncounterCounter fork: the German strings have other lengths. They are the
+-- same consecutive run of u8 arrays (pret quest_log text), so each one starts
+-- right after the previous one's terminator.
+local function readGerman(rom)
+  local off=Versions.address(0x41A155) -- gText_QuestLog_PreviouslyOnYourQuest
+  local pack={version=1,text={}}
+  for _,entry in ipairs(ENTRIES) do
+    pack.text[entry[1]]=read(rom,off)
+    for _=1,1024 do local b=rom:get(off);off=off+1;if b==255 then break end end
+  end
+  return pack
+end
 function E.read(rom)
+  if Versions.isGerman and Versions.isGerman() then return readGerman(rom) end
   local base=locate(rom);local pack={version=1,text={}}
   for _,entry in ipairs(ENTRIES) do pack.text[entry[1]]=read(rom,base+entry[2]) end
   return pack

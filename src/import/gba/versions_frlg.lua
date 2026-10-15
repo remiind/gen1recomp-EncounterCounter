@@ -2796,12 +2796,22 @@ local LEAFGREEN_10 = {}
 for key, value in pairs(FIRERED_10) do LEAFGREEN_10[key] = value end
 LEAFGREEN_10.id, LEAFGREEN_10.game = "leafgreen_1_0", "leafgreen"
 
+-- EncounterCounter fork: German Feuerrote / Blattgrüne Edition (1.0). Same
+-- importer, every ROM address goes through editions/firered_de.lua or
+-- editions/leafgreen_de.lua (FireRed USA 1.0 address -> German address).
+local FIRERED_DE, LEAFGREEN_DE = {}, {}
+for key, value in pairs(FIRERED_10) do FIRERED_DE[key] = value; LEAFGREEN_DE[key] = value end
+FIRERED_DE.id, FIRERED_DE.language = "firered_de", "de"
+LEAFGREEN_DE.id, LEAFGREEN_DE.game, LEAFGREEN_DE.language = "leafgreen_de", "leafgreen", "de"
+
 -- SHA-1 (lowercase) → version table. Engine identity is SHA-1 only.
 Versions.BY_SHA1 = {
   ["574fa542ffebb14be69902d1d36f1ec0a4afd71e"] = LEAFGREEN_10,
   ["7862c67bdecbe21d1d69ce082ce34327e1c6ed5e"] = LEAFGREEN_10,
   ["41cb23d8dccc8ebd7c649cd8fbb58eeace6e2fdc"] = FIRERED_10,
   ["dd5945db9b930750cb39d00c84da8571feebf417"] = FIRERED_10,
+  ["18a3758ceeef2c77b315144be2c3910d6f1f69fe"] = FIRERED_DE,
+  ["0802d1fb185ee3ed48d9a22afb25e66424076dac"] = LEAFGREEN_DE,
 }
 -- Legacy MD5 keys retained only for error messages / migration hints.
 Versions.BY_MD5 = {
@@ -2920,17 +2930,36 @@ end
 capture(Versions)
 local edition, addresses = "firered", nil
 
+-- edition id -> remap table module (FireRed USA 1.0 needs none)
+local EDITION_TABLES = {
+  leafgreen = "src.import.gba.editions.leafgreen_1_0",
+  firered_de = "src.import.gba.editions.firered_de",
+  leafgreen_de = "src.import.gba.editions.leafgreen_de",
+}
+
 function Versions.address(base)
   if not addresses then return base end
-  return assert(addresses[base], string.format("Missing LeafGreen address 0x%X", base))
+  return assert(addresses[base], string.format("Missing %s address 0x%X", edition, base))
+end
+
+--- Selected edition: "firered", "leafgreen", "firered_de" or "leafgreen_de".
+function Versions.edition()
+  return edition
+end
+
+function Versions.isGerman()
+  return edition == "firered_de" or edition == "leafgreen_de"
 end
 
 function Versions.select(identity)
-  local game = identity
-  if Versions.BY_SHA1[identity] then game = Versions.BY_SHA1[identity].game end
+  local key = type(identity) == "string" and Versions.identitySha1(identity) or identity
+  local ver = Versions.BY_SHA1[key]
+  local game = ver and ver.game or identity
   game = game == "leafgreen" and "leafgreen" or "firered"
-  if game == edition then return end
-  addresses = game == "leafgreen" and require("src.import.gba.editions.leafgreen_1_0") or nil
+  local want = game
+  if ver and ver.language == "de" then want = game .. "_de" end
+  if want == edition then return end
+  addresses = EDITION_TABLES[want] and require(EDITION_TABLES[want]) or nil
   for _, record in ipairs(baseline) do
     local t = record.target
     -- Root functions added below capture() are retained.
@@ -2943,7 +2972,7 @@ function Versions.select(identity)
       t[addresses and addresses[k] or k] = addresses and addresses[v] or v
     end
   end
-  edition = game
+  edition = want
 end
 
 Versions.game = require("src.import.gba.versions_game").game

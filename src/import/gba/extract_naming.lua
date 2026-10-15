@@ -302,6 +302,43 @@ return {
     out("page_swap_button_glow.png"), out("back_button_glow.png"), out("ok_button_glow.png"),
     out("cursor.png"), out("input_arrow.png"),
     out("underscore.png"), out("rival.png"))
+  -- EncounterCounter fork: the German dumps have their own keyboard (9
+  -- columns, Ä Ö Ü ä ö ü). Read sKeyboardChars / sPageColumnCounts /
+  -- sPageColumnXPos (pokefirered/src/naming_screen.c) instead of the built-in
+  -- US layout. The US dumps keep the built-in one.
+  if Versions.isGerman and Versions.isGerman() then
+    local CHARMAP = require("src.core.game3.scripting.text_ir").CHARMAP
+    local kc = Versions.address(0x3E22D0)       -- sKeyboardChars
+    local cc = Versions.address(0x3E2330)       -- sPageColumnCounts
+    local cx = Versions.address(0x3E2333)       -- sPageColumnXPos
+    local pages, rows = 3, 4
+    local cols = math.floor((cc - kc) / pages / rows)
+    assert(cols >= 8 and cols <= 10 and kc + pages * rows * cols == cc, "naming: German keyboard table")
+    local parts = { "keyboard = {\n    chars = {" }
+    for p = 0, pages - 1 do
+      parts[#parts + 1] = "{"
+      for r = 0, rows - 1 do
+        local row = {}
+        for c = 0, cols - 1 do
+          local b = get(kc + (p * rows + r) * cols + c)
+          local ch = b == 0 and " " or CHARMAP[b] or " "
+          row[#row + 1] = string.format("{byte=%d,char=%q}", b, ch)
+        end
+        parts[#parts + 1] = "{" .. table.concat(row, ",") .. "},"
+      end
+      parts[#parts + 1] = "},"
+    end
+    parts[#parts + 1] = "},\n    columnCounts = {"
+    for p = 0, pages - 1 do parts[#parts + 1] = get(cc + p) .. "," end
+    parts[#parts + 1] = "},\n    columnX = {"
+    for p = 0, pages - 1 do
+      local xs = {}
+      for c = 0, cols - 1 do xs[#xs + 1] = tostring(get(cx + p * cols + c)) end
+      parts[#parts + 1] = "{" .. table.concat(xs, ",") .. "},"
+    end
+    parts[#parts + 1] = "},\n  },\n}"
+    manifest = manifest:gsub("}%s*$", "") .. "  " .. table.concat(parts) .. "\n"
+  end
   write(cache, out("manifest.lua"), manifest)
   return true
 end

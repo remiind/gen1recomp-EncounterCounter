@@ -24,6 +24,9 @@ local function flavorBase(rom)
       -- "It's" at the start of Text_Bookshelf (Latin BPRE).
       if text and rom:get(text)==0xC3 and rom:get(text+1)==0xE8
           and rom:get(text+2)==0xB4 and rom:get(text+3)==0xE7 then return off end
+      -- EncounterCounter fork: German text ("Hier stehen ..."), the 28-script
+      -- shape alone identifies the table there.
+      if text and Versions.isGerman and Versions.isGerman() then return off end
     end
   end
   error('Original object interaction scripts not found in this FireRed ROM')
@@ -36,7 +39,7 @@ function E.readScripts(rom)
   end
   -- GetInteractedMetatileScript's preceding literal is WallTownMap.
   local pool
-  for off=0x6D000,0x6D900,4 do
+  for off=Versions.address(0x6D000),Versions.address(0x6D900),4 do
     if rom:u32(off)==base+0x08000000 and rom:u32(off+24)==base+9+0x08000000 then
       pool=off;break
     end

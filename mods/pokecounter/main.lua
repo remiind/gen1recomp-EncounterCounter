@@ -72,7 +72,8 @@ return function(mod)
 
   local function gameCode()
     local s = session()
-    local version = s and s.version or mod.version or "emerald"
+    local GV = engine("src.core.GameVersion")
+    local version = s and s.version or (GV and GV.get and GV.get()) or "emerald"
     local prefix = CODES[version] or "BPE"
     local Lang = engine("src.core.game3.lang")
     local lang = Lang and Lang.game and Lang.game() or 2

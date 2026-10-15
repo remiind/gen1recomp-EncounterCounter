@@ -120,6 +120,8 @@ GameVersion.VERSIONS = {
     revisions = {
       { sha1 = "41cb23d8dccc8ebd7c649cd8fbb58eeace6e2fdc", label = "1.0" },
       { sha1 = "dd5945db9b930750cb39d00c84da8571feebf417", label = "1.1" },
+      -- EncounterCounter fork: German "Feuerrote Edition"
+      { sha1 = "18a3758ceeef2c77b315144be2c3910d6f1f69fe", label = "DE" },
     },
     manifest = "tools/rom_manifest_firered.json",
     cachePrefix = "firered/",
@@ -139,6 +141,8 @@ GameVersion.VERSIONS = {
     revisions = {
       { sha1 = "574fa542ffebb14be69902d1d36f1ec0a4afd71e", label = "1.0" },
       { sha1 = "7862c67bdecbe21d1d69ce082ce34327e1c6ed5e", label = "1.1" },
+      -- EncounterCounter fork: German "Blattgrüne Edition"
+      { sha1 = "0802d1fb185ee3ed48d9a22afb25e66424076dac", label = "DE" },
     },
     manifest = "tools/rom_manifest_leafgreen.json",
     cachePrefix = "leafgreen/", saveSuffix = "_leafgreen",

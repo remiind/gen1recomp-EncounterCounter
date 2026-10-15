@@ -749,6 +749,10 @@ local LEVEL_UP_VERTICAL = {
 local function extract_level_up_vertical(rom, cache, root, game)
   local offsets = LEVEL_UP_VERTICAL[game]
   if not offsets then return nil end
+  -- EncounterCounter fork: German editions, FireRed USA addresses remapped
+  if Versions.isGerman and Versions.isGerman() then
+    offsets = {gfx = Versions.address(0x459888), pal = Versions.address(0x459868)}
+  end
   local tb = lz_at(rom, offsets.gfx + 0x08000000)
   assert(tb and #tb == 64, "battle_anim_extract: native level-up streak must contain two 4bpp tiles")
   local pb = {}

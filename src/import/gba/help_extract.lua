@@ -63,12 +63,30 @@ local function locate(rom)
   end
   error('Help tables not found in this ROM revision')
 end
+-- EncounterCounter fork: in the German editions the strings have other
+-- lengths and the block behind the pointer tables moved, so every part is
+-- addressed by its own pret symbol (FireRed USA 1.0 address, remapped).
+local function germanLayout()
+  if not (Versions.isGerman and Versions.isGerman()) then return nil end
+  local base = Versions.address(0x45B080)          -- sHelpSystemTopicPtrs
+  return base, {
+    greetings = Versions.address(0x1B2FC9),          -- Help_Text_Greetings
+    cancel = Versions.address(0x1B2E6F),             -- Help_Text_Cancel
+    basic = Versions.address(0x45B9BE) - base,       -- sTerms_Basic
+    contexts = Versions.address(0x45B9E0) - base,    -- sHelpSystemSubmenuItemLists
+    tiles = Versions.address(0x464008) - base,       -- sTiles
+    pals = Versions.address(0x464128) - base,        -- sPals
+  }
+end
 function Extract.read(rom)
-  local base=locate(rom)
+  local base, de = germanLayout()
+  base = base or locate(rom)
   local textBase=pointer(rom,base)
+  local L = de or { greetings = textBase + 0x1D1, cancel = textBase + 0x77,
+    basic = 0x93E, contexts = 0x960, tiles = 0x8F88, pals = 0x90A8 }
   local pack={version=1,topics={},descriptions={},entries={},contexts={},
-    greetings=readText(rom,textBase+0x1D1),cancel=readText(rom,textBase+0x77),
-    basic=list(rom,base+0x93E),tiles={},palette={}}
+    greetings=readText(rom,L.greetings),cancel=readText(rom,L.cancel),
+    basic=list(rom,base+L.basic),tiles={},palette={}}
   for i=1,6 do
     pack.topics[i]=readText(rom,pointer(rom,base+(i-1)*4))
     pack.descriptions[i]=readText(rom,pointer(rom,base+24+(i-1)*4))
@@ -83,13 +101,13 @@ function Extract.read(rom)
   for context=0,35 do
     local topics={};pack.contexts[context]=topics
     for topic=1,5 do
-      local off=base+0x960+(context*5+topic-1)*4
+      local off=base+L.contexts+(context*5+topic-1)*4
       if rom:u32(off)~=0 then topics[topic]=list(rom,pointer(rom,off)) end
     end
   end
-  for i=0,287 do pack.tiles[i+1]=rom:get(base+0x8F88+i) end
+  for i=0,287 do pack.tiles[i+1]=rom:get(base+L.tiles+i) end
   for i=0,15 do
-    local c=rom:u16(base+0x90A8+i*2)
+    local c=rom:u16(base+L.pals+i*2)
     pack.palette[i+1]={c%32/31,math.floor(c/32)%32/31,math.floor(c/1024)%32/31,1}
   end
   return pack

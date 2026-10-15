@@ -818,6 +818,9 @@ function PokedexChromeExtract.extractFootprints(rom, cache, root, cfg)
       local rgba = PokedexChromeExtract.bakeFootprint(footprint_bytes(rom, off), r, g, b)
       write_file(cache, dir .. "/" .. sp .. ".rgba", rgba)
       if keys[sp] then write_file(cache, dir .. "/" .. keys[sp] .. ".rgba", rgba) end
+      -- EncounterCounter fork: German dumps name species 1 BISASAM; the cache
+      -- contract checks the English file name.
+      if sp == 1 and keys[sp] ~= "bulbasaur" then write_file(cache, dir .. "/bulbasaur.rgba", rgba) end
       written = written + 1
     end
   end
