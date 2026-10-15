@@ -24,6 +24,7 @@ return function(mod)
     { key = "autopause", label = "SHINY AUTO-PAUSE", type = "toggle", default = true },
     { key = "host", label = "DISPLAY IP", type = "text", default = "", maxLen = 15 },
     { key = "status", label = "STATUS MESSAGES", type = "toggle", default = true },
+    { key = "team", label = "SEND TEAM", type = "toggle", default = true },
   })
 
   local function now()
@@ -285,11 +286,17 @@ return function(mod)
     p.nextAt = t + math.min(RETRY_MAX_S, RETRY_S * (1 + math.floor(p.tries / 6)))
   end
 
-  local function enqueue(json, label)
+  local function enqueue(json, label, slotKey)
     if not netInit() then return end
+    -- a newer state of the same team slot replaces one that has not gone out yet
+    if slotKey then
+      for i = #queue, 2, -1 do
+        if queue[i].slotKey == slotKey and not queue[i].firstSent then table.remove(queue, i) end
+      end
+    end
     if #queue >= QUEUE_MAX then table.remove(queue, 1) end
-    queue[#queue + 1] = { json = json, tries = 0, nextAt = 0, label = label }
-    dirty = true
+    queue[#queue + 1] = { json = json, tries = 0, nextAt = 0, label = label, slotKey = slotKey }
+    if not slotKey then dirty = true end
     pump() -- first try right away
   end
 
@@ -387,6 +394,120 @@ return function(mod)
     if not ok then log("report failed: %s", tostring(err)) end
   end)
 
+  -- ------------------------------------------------------------- team
+  -- The party as the game sees it (IVs, EVs, stats, moves ...) for the
+  -- display's web page; the games themselves never show IVs or EVs. One
+  -- packet per Pokémon ({"t":"mon",...}), sent when that slot changed: after
+  -- a battle, a level-up, vitamins, EV berries, evolution, a swap. Checked
+  -- once a second outside battle; unchanged slots are not sent again.
+  local function jstr(v)
+    v = tostring(v or "")
+    return '"' .. v:gsub('[%c"\\]', function(c)
+      if c == '"' then return '\\"' elseif c == "\\" then return "\\\\" end
+      return string.format("\\u%04x", c:byte())
+    end) .. '"'
+  end
+  local function jarr(t, fmt)
+    local out = {}
+    for i, v in ipairs(t) do out[i] = fmt and fmt(v) or string.format("%d", tonumber(v) or 0) end
+    return "[" .. table.concat(out, ",") .. "]"
+  end
+  local STAT_KEYS = { "hp", "atk", "def", "spa", "spd", "spe" }  -- order on the wire
+  local function six(t)
+    local out = {}
+    for i, k in ipairs(STAT_KEYS) do out[i] = tonumber(type(t) == "table" and t[k]) or 0 end
+    return out
+  end
+  local function name(fn, id)
+    if not fn or not id or id == 0 then return "" end
+    local ok, n = pcall(fn, id)
+    return ok and type(n) == "string" and n or ""
+  end
+
+  local function monJson(mon, slot, count)
+    local sp = national(mon.species or mon.speciesId) or 0
+    local pid = tonumber(mon.personality) or 0
+    local tid, sid = tonumber(mon.otId) or 0, tonumber(mon.otSecretId)
+    if not sid then tid, sid = band16(tid), hi16(tid) end
+    local shiny = bxor(bxor(tid, sid), bxor(hi16(pid), band16(pid))) < 8
+    local g = mon.gender
+    g = (g == "M" or g == "F") and g or "N"
+    local moves, pp, ppMax, moveNames = {}, {}, {}, {}
+    for i = 1, 4 do
+      local m = type(mon.moves) == "table" and mon.moves[i] or nil
+      if type(m) == "table" then m = m.id or m.move end
+      m = tonumber(m) or 0
+      moves[i] = m
+      pp[i] = tonumber(type(mon.pp) == "table" and mon.pp[i]) or 0
+      ppMax[i] = tonumber(type(mon.maxPp) == "table" and mon.maxPp[i]) or 0
+      moveNames[i] = m > 0 and name(Pokemon and Pokemon.moveName, m) or ""
+    end
+    local item = itemId(mon.item or mon.heldItem)
+    local ab = tonumber(mon.abilityId or mon.ability) or 0
+    local nick = ""
+    if Pokemon and Pokemon.displayMonName then
+      local ok, n = pcall(Pokemon.displayMonName, mon)
+      nick = ok and n or ""
+    end
+    local stats = {
+      tonumber(mon.maxHp) or 0, tonumber(mon.attack or mon.atk) or 0, tonumber(mon.defense or mon.def) or 0,
+      tonumber(mon.spAtk or mon.spa) or 0, tonumber(mon.spDef or mon.spd) or 0, tonumber(mon.speed or mon.spe) or 0,
+    }
+    local status = mon.status
+    if type(status) == "table" then status = status.name or status.id end
+    return table.concat({
+      '{"t":"mon","src":', jstr(gameCode()),
+      ',"slot":', tostring(slot), ',"n":', tostring(count),
+      ',"pid":', string.format("%.0f", pid), ',"sp":', tostring(sp), ',"lv":', tostring(tonumber(mon.level) or 0),
+      ',"nick":', jstr(nick), ',"g":"', g, '","shiny":', shiny and "true" or "false",
+      ',"nat":', tostring(tonumber(mon.nature) or (pid % 25)),
+      ',"ab":', tostring(ab), ',"abn":', jstr(name(Pokemon and Pokemon.abilityName, ab)),
+      ',"it":', tostring(item), ',"itn":', jstr(item > 0 and name(ItemsData and ItemsData.displayName, item) or ""),
+      ',"ivs":', jarr(six(mon.ivs)), ',"evs":', jarr(six(mon.evs)), ',"st":', jarr(stats),
+      ',"hp":', tostring(tonumber(mon.hp) or 0), ',"stat":', jstr(status or ""),
+      ',"mv":', jarr(moves), ',"mvn":', jarr(moveNames, jstr), ',"pp":', jarr(pp), ',"ppm":', jarr(ppMax),
+      ',"fr":', tostring(tonumber(mon.friendship or mon.happiness) or 0),
+      ',"pkrs":', tostring(tonumber(mon.pokerus) or 0), ',"exp":', string.format("%.0f", tonumber(mon.exp) or 0),
+      ',"ball":', tostring(tonumber(mon.pokeball) or 0), '}',
+    })
+  end
+
+  local lastTeam = {}     -- slot -> json last queued
+  local lastCount = -1
+  local teamCheckAt = 0
+  local function teamTick()
+    if mod.options:get("team") == false then return end
+    local t = now()
+    if t < teamCheckAt then return end
+    teamCheckAt = t + 1
+    local Battle = engine("src.core.game3.battle")
+    if Battle and Battle.isActive and Battle.isActive() then return end
+    local s = session()
+    local party = s and s.party
+    if type(party) ~= "table" then return end
+    local count = 0
+    for i = 1, 6 do if type(party[i]) == "table" then count = i end end
+    local sizeChanged = count ~= lastCount
+    for i = 1, count do
+      local mon = party[i]
+      if mon.isEgg or mon.egg then
+        -- eggs carry no stats worth showing; still keep the slot in order
+        local json = '{"t":"mon","src":' .. jstr(gameCode()) .. ',"slot":' .. i .. ',"n":' .. count .. ',"egg":true}'
+        if json ~= lastTeam[i] then lastTeam[i] = json; enqueue(json, nil, "mon" .. i) end
+      else
+        local ok, json = pcall(monJson, mon, i, count)
+        if ok and (json ~= lastTeam[i] or sizeChanged) then
+          lastTeam[i] = json
+          enqueue(json, nil, "mon" .. i)
+        elseif not ok then
+          log("team slot %d: %s", i, tostring(json))
+        end
+      end
+    end
+    for i = count + 1, 6 do lastTeam[i] = nil end
+    lastCount = count
+  end
+
   -- Reports still waiting survive closing the app: kept in mod.storage
   -- (per playthrough) and sent on the next start.
   local restored = false
@@ -414,7 +535,9 @@ return function(mod)
     if dirty then
       dirty = false
       local items = {}
-      for i, q in ipairs(queue) do items[i] = { json = q.json, label = q.label } end
+      for _, q in ipairs(queue) do
+        if not q.slotKey then items[#items + 1] = { json = q.json, label = q.label } end
+      end
       pcall(function() mod.storage:write(game, "pending", { format = 1, items = items }) end)
     end
   end
@@ -423,6 +546,8 @@ return function(mod)
   mod.hooks:wrap("core.update", function(next, game, dt)
     pump()
     persist(game)
+    local okT, errT = pcall(teamTick)
+    if not okT then log("team: %s", tostring(errT)) end
     if shinyAt and not held then
       if #queue == 0 or now() - shinyAt >= SHINY_WAIT_S or not udp then
         startHold()
