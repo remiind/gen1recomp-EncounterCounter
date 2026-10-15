@@ -1852,7 +1852,16 @@ function PartyMenu.handleInput(input)
       elseif PartyMenu._fieldMoveNames and PartyMenu._fieldMoveNames[act] then
         local FieldMoves = require("src.core.game3.field_moves")
         local mon = PartyMenu._party and PartyMenu._party[PartyMenu.cursor]
-        if act == "SOFTBOILED" or act == "MILK DRINK" then
+        -- The labels come from the ROM's sCursorOptions, so they are in the
+        -- ROM's language ("FLIEGEN" in a German Emerald); resolve the move id
+        -- through the field move table instead of parsing the label.
+        local fmId
+        do
+          local g = PartyMenu._fieldMoveData
+          local i = g and g.index and g.index[act]
+          fmId = (i and g.moves and g.moves[i + 1]) or FieldMoves.normalizeMoveId(act)
+        end
+        if fmId == FieldMoves.MOVES.SOFTBOILED or fmId == FieldMoves.MOVES.MILK_DRINK then
           local maxHp = mon and (mon.maxHp or (mon.stats and mon.stats.hp)) or 0
           local cost = math.floor(maxHp / 5)
           local curHp = mon and (mon.hp or 0) or 0
@@ -1911,7 +1920,7 @@ function PartyMenu.handleInput(input)
             -- pokefirered/src/field_effect.c:2126 SetWarpDestinationToEscapeWarp
             escapeWarp = PartyMenu._session and PartyMenu._session.escapeWarp,
           }
-          local res = FieldMoves.fromMenu(act, ctx)
+          local res = FieldMoves.fromMenu(fmId or act, ctx)
           if not res or not res.ok then
             se("SE_SELECT") -- pokefirered/src/party_menu.c:3910
             -- pokeemerald/src/party_menu.c:3727
