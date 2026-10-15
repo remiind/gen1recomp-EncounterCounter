@@ -102,7 +102,7 @@ print("[test] a Route 101 step rolls a Wurmple (pokeemerald/src/wild_encounter.c
 lead(nil)
 Encounters._immunitySteps = 4
 Encounters._rsePrevBehavior = 1
-script({ 100, 0, 0, 7, 7, 0 })
+script({ 100, 0, 0, 7, 7, 0, 0, 0 })
 local enc = Encounters.onStep("EM_ROUTE101", "land", { behavior = 1 })
 unscript()
 check(enc ~= nil, "encounter")
@@ -127,7 +127,7 @@ local slotWant = { [0] = 1, [19] = 1, [20] = 2, [39] = 2, [40] = 3, [50] = 4, [6
 for rand, idx in pairs(slotWant) do
   Encounters._immunitySteps = 4
   Encounters._rsePrevBehavior = 1
-  script({ 0, rand, 0, 0, 0, 0 })
+  script({ 0, rand, 0, 0, 0, 0, 0, 0 })
   local e = Encounters.onStep("EM_ROUTE101", "land", { behavior = 1 })
   unscript()
   eq(e and e.species, R101[idx].species, "rand " .. rand .. " -> slot " .. idx)
@@ -142,7 +142,7 @@ eq(Encounters.onStep("EM_ROUTE101", "land", { behavior = 1 }), nil, "weak wild m
 unscript()
 lead("ABILITY_KEEN_EYE", 10)
 Encounters._immunitySteps = 4
-script({ 0, 0, 0, 1, 3, 3, 0 })
+script({ 0, 0, 0, 1, 3, 3, 0, 0, 0 })
 local keen = Encounters.onStep("EM_ROUTE101", "land", { behavior = 1 })
 unscript()
 eq(keen and keen.species, 290, "coin flip lets it through")
@@ -162,14 +162,14 @@ print("[test] Magnet Pull picks a Steel slot (pokeemerald/src/wild_encounter.c:9
 lead("ABILITY_MAGNET_PULL")
 Encounters._immunitySteps = 4
 Encounters._rsePrevBehavior = 1
-script({ 0, 0, 0, 0, 0, 0, 0 })
+script({ 0, 0, 0, 0, 0, 0, 0, 0, 0 })
 local mp = Encounters.onStep("EM_ROUTE_STEEL", "land", { behavior = 1 })
 unscript()
 eq(mp and mp.species, 81, "Magnemite from the only Steel slot")
 
 print("[test] Synchronize (pokeemerald/src/wild_encounter.c:335)")
 lead("ABILITY_SYNCHRONIZE", 5, 13)
-script({ 0, 13, 0 })
+script({ 0, 13, 0, 0, 0 })
 local syn = rules.createWild(290, 3)
 unscript()
 eq(syn.personality % 25, 13, "nature follows the lead")
@@ -177,7 +177,7 @@ eq(syn.personality % 25, 13, "nature follows the lead")
 print("[test] Cute Charm (pokeemerald/src/wild_encounter.c:379)")
 lead("ABILITY_CUTE_CHARM", 5, 0)
 Pokemon._speciesMeta[1] = { genderRatio = 127 }
-script({ 1, 5, 205, 0 })
+script({ 1, 5, 205, 0, 0, 0 })
 local cc = rules.createWild(290, 3)
 unscript()
 eq(cc.personality % 25, 5, "nature kept")
@@ -231,7 +231,7 @@ Encounters._tables.EM_ROUTE119 = { fishing = { rate = 30, slots = {
 } } }
 session.dewfordTrends = { { rand = 2 } }
 local water = function() return 5 end
-script({ 0, 3, 0, 0, 0 })
+script({ 0, 3, 0, 0, 0, 0, 0 })
 local fb = Encounters.rollFishing("EM_ROUTE119", "old", { x = 0, y = 19, behaviorAt = water, mapWidth = 1 })
 unscript()
 eq(fb and fb.species, 328, "seed 2 puts a Feebas spot on fishing spot 20")

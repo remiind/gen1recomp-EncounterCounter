@@ -32,6 +32,10 @@ set -uo pipefail
 
 cd "$(dirname "$0")/.."
 
+# EncounterCounter fork: release builds never self-update (src/update/Boot.lua);
+# the upstream updater tests exercise the gate behind that switch.
+export POKEPORT_FORK_ALLOW_UPDATES=1
+
 LUA=${LUA:-luajit}
 LUA54=${LUA54:-lua5.4}
 BLESS=0
