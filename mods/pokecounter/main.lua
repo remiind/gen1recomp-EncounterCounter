@@ -25,6 +25,7 @@ return function(mod)
     { key = "host", label = "DISPLAY IP", type = "text", default = "", maxLen = 15 },
     { key = "status", label = "STATUS MESSAGES", type = "toggle", default = true },
     { key = "team", label = "SEND TEAM", type = "toggle", default = true },
+    { key = "hunt", label = "AUTO-HUNT (F10)", type = "toggle", default = true },
   })
 
   local function now()
@@ -352,6 +353,8 @@ return function(mod)
   end
 
   -- ---------------------------------------------------------- encounters
+  local encSeq, lastShiny = 0, false   -- every reported wild Pokémon (auto-hunt)
+
   local function packIvs(ivs)
     if type(ivs) ~= "table" then return 0 end
     local function iv(k) return math.max(0, math.min(31, tonumber(ivs[k]) or 0)) end
@@ -379,6 +382,8 @@ return function(mod)
       love.math.random(1, 2147483646), packIvs(mon.ivs), tonumber(mon.abilityId or mon.ability) or 0,
       itemId(mon.item or mon.heldItem), tsv, gameCode())
     log("wild encounter: %s", json)
+    encSeq = encSeq + 1
+    lastShiny = shiny
     if shiny and mod.options:get("autopause") ~= false then
       shinyAt = now()
       shinyName = mon.name or mon.nickname
@@ -543,6 +548,115 @@ return function(mod)
     end
   end
 
+  -- ------------------------------------------------------------ auto-hunt
+  -- F10 (or the mod option) starts a soft-reset hunt for a static Pokémon:
+  -- save in front of it, press F10. The game goes back to the title screen,
+  -- waits a random number of frames, presses A (B during FireRed's quest log
+  -- replay) until the wild battle starts, and resets again unless the
+  -- Pokémon is shiny. It runs as fast as the PC allows, muted, and never
+  -- saves. Three resets in a row without a battle (2 minutes of game time
+  -- each) stop it. A shiny stops it and the shiny pause holds the game.
+  local HUNT_SPEED = 64             -- logic steps per frame, capped by the frame's time budget
+  local HUNT_TIMEOUT_TICKS = 120 * 60
+  local HUNT_MAX_TIMEOUTS = 3
+  local hunt = nil
+
+  local function huntRestart(game)
+    hunt.ticks = 0
+    hunt.nextTap = love.math.random(0, 120)   -- own start delay -> own RNG state per reset
+    hunt.encSeen = encSeq
+    game.softResetRequested = true             -- handled at the next logic step (Game3:fixedUpdate)
+  end
+
+  local function huntStop(game, why)
+    if not hunt then return end
+    game.speedOverride = hunt.prevSpeed
+    pcall(love.audio.setVolume, hunt.prevVolume or 1)
+    local n = hunt.resets
+    hunt = nil
+    if why == "shiny" then
+      toast(string.format("Auto-Jagd: SHINY nach %d Resets!", n))
+    elseif why == "nobattle" then
+      toast(string.format("Auto-Jagd gestoppt: %d Resets ohne Kampf - vor dem Pokemon speichern", HUNT_MAX_TIMEOUTS))
+    else
+      toast(string.format("Auto-Jagd AUS (%d Resets)", n))
+    end
+    log("auto-hunt stopped (%s) after %d resets", why, n)
+  end
+
+  local function huntStart(game)
+    if held or shinyAt then
+      toast("Auto-Jagd: erst das Shiny bestaetigen (START/SELECT halten)")
+      return
+    end
+    if not game.boot and not game.session then return end
+    local okV, vol = pcall(love.audio.getVolume)
+    hunt = {
+      resets = 0, timeouts = 0, startedAt = now(),
+      prevSpeed = game.speedOverride, prevVolume = okV and vol or 1,
+    }
+    game.speedOverride = HUNT_SPEED
+    pcall(love.audio.setVolume, 0)
+    toast("Auto-Jagd AN: Reset, A druecken, Shiny pruefen - F10 beendet")
+    log("auto-hunt started")
+    huntRestart(game)
+  end
+
+  local function huntToggle(game)
+    if hunt then huntStop(game, "user") else huntStart(game) end
+  end
+
+  -- every logic tick: battle seen -> shiny? / timeout
+  local function huntCheck(game)
+    if not hunt then return end
+    if encSeq ~= hunt.encSeen then
+      hunt.encSeen = encSeq
+      hunt.timeouts = 0
+      if lastShiny then
+        huntStop(game, "shiny")
+        return
+      end
+      hunt.resets = hunt.resets + 1
+      if hunt.resets % 25 == 0 then toast(string.format("Auto-Jagd: %d Resets", hunt.resets)) end
+      huntRestart(game)
+    elseif hunt.ticks >= HUNT_TIMEOUT_TICKS then
+      hunt.timeouts = hunt.timeouts + 1
+      if hunt.timeouts >= HUNT_MAX_TIMEOUTS then
+        huntStop(game, "nobattle")
+      else
+        huntRestart(game)
+      end
+    end
+  end
+
+  -- one game logic tick: count it, press A (B during the quest log replay)
+  mod.hooks:wrap("input.step", function(next, game, dt)
+    if hunt and not held then
+      local okH, errH = pcall(huntCheck, game)
+      if not okH then
+        log("auto-hunt: %s", tostring(errH))
+        huntStop(game, "error")
+      end
+    end
+    if hunt and not held then
+      hunt.ticks = hunt.ticks + 1
+      if hunt.ticks >= hunt.nextTap then
+        mod.input:tap(game, game.phase == "quest_log" and "b" or "a")
+        hunt.nextTap = hunt.ticks + love.math.random(8, 30)
+      end
+    end
+    return next(game, dt)
+  end)
+
+  -- the hunt never writes the save (no accidental save from a menu)
+  mod.hooks:wrap("save.write", function(next, game)
+    if hunt then
+      log("auto-hunt: save blocked")
+      return false
+    end
+    return next(game)
+  end)
+
   -- ------------------------------------------------------------- hooks
   mod.hooks:wrap("core.update", function(next, game, dt)
     pump()
@@ -572,6 +686,10 @@ return function(mod)
   -- While held, presses never reach the game (no buffered A press after the
   -- resume, no F1/F2 save hotkeys); releases still do, so nothing sticks.
   mod.hooks:wrap("input.key", function(next, game, ev)
+    if ev and ev.phase == "pressed" and ev.key == "f10" and mod.options:get("hunt") ~= false then
+      huntToggle(game)
+      return true
+    end
     if held and ev and ev.phase == "pressed" then return true end
     return next(game, ev)
   end)
@@ -607,6 +725,18 @@ return function(mod)
         g.setColor(1, 1, 1, 1)
         g.printf(m.text, gx + 6, y + 3, gw - 12, "left")
       end
+      g.pop()
+    end
+    if hunt then
+      local f = font(gh * 0.03)
+      local mins = math.max(1 / 60, (t - hunt.startedAt) / 60)
+      local line = string.format("AUTO-JAGD  %d Resets  %.0f/h  (F10 = aus)", hunt.resets, hunt.resets / mins * 60)
+      g.push("all")
+      g.setFont(f)
+      g.setColor(0, 0, 0, 0.6)
+      g.rectangle("fill", gx, gy, gw, f:getHeight() + 6)
+      g.setColor(0.6, 1, 0.6, 1)
+      g.printf(line, gx + 6, gy + 3, gw - 12, "left")
       g.pop()
     end
     if not (held or shinyAt) then return end

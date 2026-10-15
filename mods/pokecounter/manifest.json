@@ -1,17 +1,26 @@
 {
   "id": "pokecounter",
   "name": "PokeCounter",
-  "version": "1.4.0",
+  "version": "1.5.0",
   "api": 2,
   "entry": "main.lua",
   "profile": "content",
   "category": "UI",
   "game_version": ">=0.0.0-0 <2.0.0",
   "priority": 100,
-  "games": ["emerald", "ruby", "sapphire", "firered", "leafgreen"],
+  "games": [
+    "emerald",
+    "ruby",
+    "sapphire",
+    "firered",
+    "leafgreen"
+  ],
   "dependencies": [],
   "optional_dependencies": [],
   "conflicts": [],
-  "permissions": ["network", "engine_internals"],
-  "description": "Reports every wild encounter to the PokeCounter display (UDP 4210, like the EncounterCounter emulators) and pauses the game on a shiny until START or SELECT is held for 2 seconds."
+  "permissions": [
+    "network",
+    "engine_internals"
+  ],
+  "description": "Reports every wild encounter to the PokeCounter display (UDP 4210, like the EncounterCounter emulators) and pauses the game on a shiny until START or SELECT is held for 2 seconds. F10 starts a soft-reset auto-hunt for a static Pokémon."
 }

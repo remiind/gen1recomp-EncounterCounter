@@ -13,4 +13,11 @@ using the same UDP protocol as the EncounterCounter forks of mGBA and melonDS
 - Team (option "SEND TEAM", on by default): after each battle and whenever the
   party changes, one packet per Pokémon ({"t":"mon",...}: IVs, EVs, stats,
   nature, ability, item, moves, names from the ROM) for the display's Team tab.
+- Auto-hunt (F10, option "AUTO-HUNT (F10)"): save in front of a static Pokémon
+  (legendary, Snorlax ...), press F10. The game returns to the title screen,
+  waits a random number of frames, presses A (B during FireRed's quest log
+  replay) until the battle starts and resets again unless the Pokémon is
+  shiny, as fast as the PC allows and muted. It never saves. A shiny stops it
+  and the shiny pause holds the game; three resets in a row without a battle
+  (2 minutes of game time each) stop it too. F10 again stops it by hand.
 - Ships inside game.love of the fork's Windows and Android builds.
