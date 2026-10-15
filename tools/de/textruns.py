@@ -70,12 +70,24 @@ def main():
             return 0
         return 1 if se == sd else 0
 
+    def layout_score(run, ys):
+        """placeholder matches, minus places where the run does not go
+        forward string by string (a German run keeps the US order)"""
+        sc = sum(match(o, y) for o, y in zip(run, ys))
+        prev = None
+        for y in ys:
+            if y is not None and prev is not None and y <= prev:
+                sc -= 1
+            if y is not None:
+                prev = y
+        return sc
+
     changed = checked = 0
     for run in runs:
         if len(run) < 2:
             continue
         cur_y = [by_off[o][0]["de"] for o in run]
-        base_score = sum(match(o, y) for o, y in zip(run, cur_y))
+        base_score = layout_score(run, cur_y)
         best = (base_score, None)
         covered = set()   # (index, y) already part of a tried layout
         for k, yk in enumerate(cur_y):
@@ -102,7 +114,7 @@ def main():
             if not ok:
                 continue
             covered.update(enumerate(pos))
-            sc = sum(match(o, y) for o, y in zip(run, pos))
+            sc = layout_score(run, pos)
             if sc > best[0]:
                 best = (sc, pos)
         checked += 1

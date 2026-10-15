@@ -22,3 +22,27 @@ Regenerate (needs both ROMs; nothing ROM-derived beyond addresses is stored):
         src/import/gba/syms/emerald_funcs.lua
     python3 tools/de/gen_de_syms.py src/import/gba/syms src/import/gba/syms \
         rows.json emerald_de tools/de/overrides.json
+
+# German FireRed / LeafGreen remap tables
+
+The FRLG importer works on FireRed USA 1.0 addresses (LeafGreen goes through
+`editions/leafgreen_1_0.lua`). The German "Feuerrote Edition" (SHA-1
+`18a3758ceeef2c77b315144be2c3910d6f1f69fe`) and "Blattgrüne Edition"
+(`0802d1fb185ee3ed48d9a22afb25e66424076dac`) get `editions/firered_de.lua`
+and `editions/leafgreen_de.lua`: every address literal of the importer,
+FireRed USA 1.0 address -> German address. Built from pret's `.sym` files of
+pokefirered / pokeleafgreen (`make firered leafgreen`, `*.sym`):
+
+    # syms in demap's Lua format (any script that writes the
+    # `objs`/`data` blocks of src/import/gba/syms/*.lua will do)
+    python3 tools/de/demap.py fr_us.gba fr_de.gba fr_data.lua fr_funcs.lua
+    python3 tools/de/textruns.py fr_us.gba fr_de.gba rows.json rows_runs.json
+    python3 tools/de/gen_frlg_de_profile.py src/import/gba/editions/firered_de.lua \
+        firered_de fr_us.gba fr_de.gba rows_runs.json pokefirered.sym
+    # LeafGreen: same with the LG ROMs/syms, then
+    python3 tools/de/gen_frlg_de_profile.py src/import/gba/editions/leafgreen_de.lua \
+        leafgreen_de lg_us.gba lg_de.gba rows_runs.json pokeleafgreen.sym pokefirered.sym
+
+`textruns.py` lays out runs of adjacent strings one after another (German
+keeps the order, only lengths change); the few addresses that need a hand
+check are `OVERRIDES` in `gen_frlg_de_profile.py`.
