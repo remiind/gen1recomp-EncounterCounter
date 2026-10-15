@@ -10,13 +10,11 @@ name: ci
 # The T3 content tier asserts Pokemon Red facts; scripts/test.sh detects
 # data/generated/ is absent and skips it rather than failing.
 #
+# EncounterCounter fork: only on demand (Actions -> ci -> Run workflow). Its
+# APK is the upstream dev build "gen1recomp (dev)"; the fork's own app comes
+# from android-de.yml ("gen1recomp DE").
 on:
-  push:
-    branches: [dev, main]
-  # PRs into dev only: a dev -> main ship PR reuses the required checks the
-  # dev push already put on the same head SHA, so it needs no second run.
-  pull_request:
-    branches: [dev]
+  workflow_dispatch:
 
 # a force-push while CI is mid-run should cancel the stale run, not queue
 concurrency:
