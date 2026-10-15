@@ -44,9 +44,22 @@ jobs:
       - name: Build APK
         env:
           GEN1RECOMP_APP_NAME: "gen1recomp DE"
+          GEN1RECOMP_DEBUG_KEYSTORE: ${{ github.workspace }}/mobile/fork/debug.keystore
         run: |
           set -euo pipefail
           scripts/build_android.sh --test-application-id com.remiind.gen1recomp.de
+
+      # Fail instead of shipping an APK that would not install over the last one
+      - name: Check the signing certificate
+        run: |
+          set -euo pipefail
+          SIGNER="$ANDROID_SDK_ROOT/build-tools/36.0.0/apksigner"
+          for apk in $(find dist/android -name '*.apk'); do
+            certs="$("$SIGNER" verify --print-certs "$apk")"
+            echo "$apk"; echo "$certs" | grep -i sha-256
+            echo "$certs" | grep -qi "d26338194ec04d64b8d6888224b3c23c1be8025ddf706af216cacbf6910cf7ce" \
+              || { echo "APK is not signed with mobile/fork/debug.keystore"; exit 1; }
+          done
 
       - uses: actions/upload-artifact@v4
         with:
