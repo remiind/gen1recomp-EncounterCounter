@@ -422,7 +422,19 @@ FldeffMisc.HANDLERS = {
   -- pokeemerald/src/fldeff_rocksmash.c:161
   FLDEFF_USE_ROCK_SMASH = fieldMove("FLDEFF_USE_ROCK_SMASH", "SE_M_ROCK_THROW"),
   -- pokeemerald/src/fldeff_strength.c:46
-  FLDEFF_USE_STRENGTH = fieldMove("FLDEFF_USE_STRENGTH", nil),
+  FLDEFF_USE_STRENGTH = (function()
+    local run = fieldMove("FLDEFF_USE_STRENGTH", nil)
+    return function()
+      -- pokeemerald/src/fldeff_strength.c:53 GetMonNickname(.., gStringVar1):
+      -- Text_MonUsedStrength prints {STR_VAR_1}, which nothing else fills
+      local ctx = vmCtx()
+      local mon = partyMon(FE().fieldEffectArgument(0, 0))
+      if ctx and ctx.stringVars and mon then
+        ctx.stringVars[1] = require("src.core.game3.pokemon").displayMonName(mon)
+      end
+      return run()
+    end
+  end)(),
   FLDEFF_USE_SURF = useSurf,
   FLDEFF_USE_WATERFALL = useWaterfall,
   FLDEFF_USE_DIVE = useDive,
