@@ -25,6 +25,7 @@ return function(mod)
     { key = "host", label = "DISPLAY IP", type = "text", default = "", maxLen = 15 },
     { key = "status", label = "STATUS MESSAGES", type = "toggle", default = true },
     { key = "team", label = "SEND TEAM", type = "toggle", default = true },
+    { key = "boxes", label = "SEND PC BOXES", type = "toggle", default = true },
     { key = "hunt", label = "AUTO-HUNT (F10/F11)", type = "toggle", default = true },
     { key = "starter", label = "STARTER (RSE)", type = "choice", default = "1",
       choices = { { "0", "LINKS" }, { "1", "MITTE" }, { "2", "RECHTS" } } },
@@ -299,7 +300,18 @@ return function(mod)
       end
     end
     if #queue >= QUEUE_MAX then table.remove(queue, 1) end
-    queue[#queue + 1] = { json = json, tries = 0, nextAt = 0, label = label, slotKey = slotKey }
+    local entry = { json = json, tries = 0, nextAt = 0, label = label, slotKey = slotKey }
+    local isBox = slotKey and slotKey:sub(1, 3) == "box"
+    local at = #queue + 1
+    if not isBox then
+      -- encounters and team ahead of box packets still waiting: a whole PC
+      -- upload must not hold back a report (or the shiny pause behind it)
+      for i = 2, #queue do
+        local k = queue[i].slotKey
+        if k and k:sub(1, 3) == "box" and not queue[i].firstSent then at = i; break end
+      end
+    end
+    table.insert(queue, at, entry)
     if not slotKey then dirty = true end
     pump() -- first try right away
   end
@@ -518,6 +530,73 @@ return function(mod)
     lastCount = count
   end
 
+  -- ------------------------------------------------------------ PC boxes
+  -- The storage system as the game holds it right now, for the display's
+  -- Boxes tab: {"t":"box",...} with half a box per packet (one datagram),
+  -- [slot,sp,lv,fl,pid,ivs,it,ab,"nick",ball] per Pokémon, fl = shiny | gender<<1 | egg<<3.
+  -- Checked every 2 seconds outside battle; only changed halves are sent.
+  local lastBox = {}      -- "b:h" -> json last queued
+  local boxCheckAt = 0
+  local function boxMonJson(mon, slot)
+    local sp = national(mon.species or mon.speciesId)
+    if not sp or sp < 1 then return nil end
+    local pid = tonumber(mon.personality) or 0
+    local tid, sid = tonumber(mon.otId) or 0, tonumber(mon.otSecretId)
+    if not sid then tid, sid = band16(tid), hi16(tid) end
+    local shiny = bxor(bxor(tid, sid), bxor(hi16(pid), band16(pid))) < 8
+    local egg = mon.isEgg or mon.egg
+    local g = mon.gender
+    local fl = (shiny and 1 or 0) + ((g == "M" and 0) or (g == "F" and 1) or 2) * 2 + (egg and 8 or 0)
+    local nick = ""
+    if not egg and Pokemon and Pokemon.displayMonName then
+      local ok, n = pcall(Pokemon.displayMonName, mon)
+      nick = ok and type(n) == "string" and n or ""
+    end
+    return string.format('[%d,%d,%d,%d,%.0f,%.0f,%d,%d,%s,%d]', slot, sp, egg and 0 or (tonumber(mon.level) or 0), fl, pid,
+      packIvs(mon.ivs), itemId(mon.item or mon.heldItem), tonumber(mon.abilityId or mon.ability) or 0, jstr(nick),
+      tonumber(mon.pokeball) or 0)
+  end
+
+  local function boxTick()
+    if mod.options:get("boxes") == false or hunt then return end
+    local t = now()
+    if t < boxCheckAt then return end
+    boxCheckAt = t + 2
+    local Battle = engine("src.core.game3.battle")
+    if Battle and Battle.isActive and Battle.isActive() then return end
+    local s = session()
+    local storage = s and s.storage
+    if type(storage) ~= "table" or type(storage.boxes) ~= "table" then return end
+    local nb = math.min(#storage.boxes, 18)
+    if nb < 1 then return end
+    local cur = math.max(1, math.min(nb, tonumber(storage.currentBox) or 1))
+    local src = gameCode()
+    for b = 1, nb do
+      local box = storage.boxes[b] or {}
+      local mons = type(box.mons) == "table" and box.mons or {}
+      local name = type(box.name) == "string" and box.name or ("BOX " .. b)
+      for h = 0, 1 do
+        local items = {}
+        for slot = h * 15 + 1, h * 15 + 15 do
+          local mon = mons[slot]
+          if type(mon) == "table" then
+            local ok, m = pcall(boxMonJson, mon, slot)
+            if ok and m then items[#items + 1] = m elseif not ok then log("box %d slot %d: %s", b, slot, tostring(m)) end
+          end
+        end
+        local json = table.concat({
+          '{"t":"box","src":', jstr(src), ',"b":', b, ',"h":', h, ',"nb":', nb, ',"cur":', cur,
+          ',"name":', jstr(name), ',"m":[', table.concat(items, ","), ']}',
+        })
+        local key = b .. ":" .. h
+        if json ~= lastBox[key] then
+          lastBox[key] = json
+          enqueue(json, nil, "box" .. key)
+        end
+      end
+    end
+  end
+
   -- Reports still waiting survive closing the app: kept in mod.storage
   -- (per playthrough) and sent on the next start.
   local restored = false
@@ -726,6 +805,8 @@ return function(mod)
   mod.hooks:wrap("core.update", function(next, game, dt)
     pump()
     persist(game)
+    local okB, errB = pcall(boxTick)
+    if not okB then log("boxes: %s", tostring(errB)) end
     local okT, errT = pcall(teamTick)
     if not okT then log("team: %s", tostring(errT)) end
     if shinyAt and not held then

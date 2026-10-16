@@ -13,6 +13,9 @@ using the same UDP protocol as the EncounterCounter forks of mGBA and melonDS
 - Team (option "SEND TEAM", on by default): after each battle and whenever the
   party changes, one packet per Pokémon ({"t":"mon",...}: IVs, EVs, stats,
   nature, ability, item, moves, names from the ROM) for the display's Team tab.
+- PC boxes (option "SEND PC BOXES", on by default): every 2 seconds outside
+  battle the storage system is compared with what was sent; changed boxes go
+  out as {"t":"box",...}, half a box per packet, for the display's Boxes tab.
 - Auto-hunt (F10, option "AUTO-HUNT (F10)"): save in front of a static Pokémon
   (legendary, Snorlax ...), press F10. The game returns to the title screen,
   waits a random number of frames, presses A (B during FireRed's quest log
