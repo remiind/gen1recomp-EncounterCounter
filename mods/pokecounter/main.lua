@@ -26,6 +26,7 @@ return function(mod)
     { key = "status", label = "STATUS MESSAGES", type = "toggle", default = true },
     { key = "team", label = "SEND TEAM", type = "toggle", default = true },
     { key = "boxes", label = "SEND PC BOXES", type = "toggle", default = true },
+    { key = "evs", label = "EV-ANZEIGE", type = "toggle", default = true },
     { key = "hunt", label = "AUTO-HUNT (F10/F11)", type = "toggle", default = true },
     { key = "starter", label = "STARTER (RSE)", type = "choice", default = "1",
       choices = { { "0", "LINKS" }, { "1", "MITTE" }, { "2", "RECHTS" } } },
@@ -406,12 +407,30 @@ return function(mod)
     enqueue(json, (shiny and "SHINY " or "") .. "#" .. sp)
   end
 
+  -- which EVs the wild Pokémon gives, at the start of the battle (bottom left)
+  local EV_NAMES = { hp = "KP", atk = "Angriff", def = "Verteidigung", spa = "Sp.-Angriff", spd = "Sp.-Verteidigung", spe = "Initiative" }
+  local EV_ORDER = { "hp", "atk", "def", "spa", "spd", "spe" }
+  local function showEvs(mon)
+    if mod.options:get("evs") == false or hunt or not (Pokemon and Pokemon.evYield) then return end
+    local ok, y = pcall(Pokemon.evYield, mon)
+    if not ok or type(y) ~= "table" then return end
+    local parts = {}
+    for _, k in ipairs(EV_ORDER) do
+      local v = tonumber(y[k]) or 0
+      if v > 0 then parts[#parts + 1] = "+" .. v .. " " .. EV_NAMES[k] end
+    end
+    if #parts == 0 then return end
+    toasts[#toasts + 1] = { text = "EVs: " .. table.concat(parts, ", "), untilT = now() + 4 }
+    while #toasts > 3 do table.remove(toasts, 1) end
+  end
+
   mod.events:on("battle.started", function(ev)
     if type(ev) ~= "table" or ev.kind ~= "wild" then return end
     if hunt and hunt.mode == "gift" then return end   -- gift hunt: only the new party Pokémon counts
     local st = ev.battle
     local mon = st and st.enemy and st.enemy.mon
     if type(mon) ~= "table" then return end
+    pcall(showEvs, mon)
     local ok, err = pcall(report, mon)
     if not ok then log("report failed: %s", tostring(err)) end
   end)
